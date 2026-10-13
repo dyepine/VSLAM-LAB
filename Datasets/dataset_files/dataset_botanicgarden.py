@@ -18,7 +18,8 @@ from scipy.spatial.transform import Rotation
 
 from Datasets.DatasetVSLAMLAB import DatasetVSLAMLAB
 from path_constants import VSLAM_LAB_DIR
-from utilities import downloadFile, run_rosbag_frame_extraction, write_csv_rows
+from utilities import (downloadFile, download_onedrive_file, ResumeNotSupportedError,
+                       run_rosbag_frame_extraction, write_csv_rows)
 
 
 def read_calibration(path):
@@ -133,6 +134,7 @@ class BotanicgardenDataset(DatasetVSLAMLAB):
             "GT_pose_qnew.zip": self.cfg["groundtruth"],
         }
         paths = {}
+        providers = {}
         # Own the partial import before network IO so a failed download can be retried.
         sources = self.sequence_path(sequence_name) / "sources.json"
         if not sources.exists():
@@ -145,13 +147,24 @@ class BotanicgardenDataset(DatasetVSLAMLAB):
             if not verified(path, asset):
                 if path.exists():
                     raise ValueError(f"Incomplete source: {path}; resume download before importing")
-                downloadFile(
-                    self.cfg["mirror_root"] + "/" + name + "/content",
-                    str(destination),
-                    asset["size"],
-                    filename=name,
-                    checksum="md5:" + asset["md5"],
-                )
+                share = asset.get("onedrive")
+                providers[name] = "sjtu"
+                try:
+                    downloadFile(
+                        self.cfg["mirror_root"] + "/" + name + "/content",
+                        str(destination), asset["size"], filename=name,
+                        checksum="md5:" + asset["md5"], resume_required=bool(share),
+                        attempts=1 if share else 10,
+                    )
+                except (ResumeNotSupportedError, OSError):
+                    if not share:
+                        raise
+                    print(f"{name}: mirror cannot complete transfer; switching to official OneDrive with resume", flush=True)
+                    download_onedrive_file(share, str(destination), asset["size"],
+                                           filename=name, checksum="md5:" + asset["md5"])
+                    providers[name] = "onedrive"
+            else:
+                providers[name] = "local_verified"
             paths[name] = str(path.resolve())
         calib = raw / "calib"
         for relative in self.cfg["calibration_files"]:
@@ -168,6 +181,7 @@ class BotanicgardenDataset(DatasetVSLAMLAB):
             json.dumps(
                 {
                     "files": paths,
+                    "download_providers": providers,
                     "mirror_root": self.cfg["mirror_root"],
                     "calibration_root": self.cfg["calibration_root"],
                     "checksums": assets,

@@ -583,9 +583,11 @@ def downloadFile(url, dest_dir_path, file_size=None):
 
     return dest_file_path
     
-def downloadFile(url, dest_dir_path, file_size=None, *, filename=None, checksum=None):
+def downloadFile(url, dest_dir_path, file_size=None, *, filename=None, checksum=None,
+                 resume_required=False, attempts=_MAX_DOWNLOAD_ATTEMPTS):
     if filename is not None:
-        return _download_named_file(url, Path(dest_dir_path) / filename, file_size, checksum)
+        return _download_named_file(url, Path(dest_dir_path) / filename, file_size, checksum,
+                                    resume_required=resume_required, attempts=attempts)
     file_name = url.split('/')[-1]
     dest_file_path = os.path.join(dest_dir_path, file_name)
 
@@ -1192,15 +1194,51 @@ def synapse_download_folder(syn, folder_id: str, dest_dir: str | Path) -> None:
 
 
 
-def _download_named_file(url, path, size, checksum):
+class ResumeNotSupportedError(RuntimeError):
+    """A source ignored Range; the existing partial file has been preserved."""
+
+
+def download_onedrive_file(share_url, directory, size, *, filename, checksum):
+    """Resolve a public share on each retry, then use the common verified downloader.
+
+    Anonymous share resolution follows eugenenuke/onedrive-downloader; no account
+    token, signed download URL or login is persisted or printed.
+    """
+    import base64
+    import json
+    def resolve():
+        request = urllib.request.Request('https://api-badgerp.svc.ms/v1.0/token',
+            data=json.dumps({'appId': '5cbed6ac-a083-4e14-b191-b4ba07653de2'}).encode(),
+            headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            token = json.load(response)['token']
+        encoded = base64.urlsafe_b64encode(share_url.encode()).decode().rstrip('=')
+        request = urllib.request.Request(
+            'https://my.microsoftpersonalcontent.com/_api/v2.0/shares/u!' + encoded +
+            '/driveitem?select=@content.downloadUrl,id,name,size', data=b'',
+            headers={'Authorization': 'Badger ' + token, 'Prefer': 'autoredeem', 'Accept': 'application/json'})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            item = json.load(response)
+        if item.get('name') != filename or item.get('size') != size:
+            raise ValueError(f'OneDrive source metadata differs for {filename}')
+        return item['@content.downloadUrl']
+    return downloadFile(resolve, directory, size, filename=filename, checksum=checksum,
+                        resume_required=True)
+
+
+def _download_named_file(url, path, size, checksum, *, resume_required=False,
+                         attempts=_MAX_DOWNLOAD_ATTEMPTS):
     """Opt-in atomic, resumable download for named /content endpoints.
 
     Existing callers of downloadFile retain their original behavior.
     Incomplete data survives failures under .part; only verified data becomes final.
     """
     import hashlib
+    import re
     if not size or not checksum:
         raise ValueError('Named downloads require expected size and checksum')
+    if not isinstance(attempts, int) or attempts < 1:
+        raise ValueError('Download attempts must be a positive integer')
     algorithm, expected = checksum.split(':', 1)
     def verify(candidate):
         if candidate.stat().st_size != size:
@@ -1216,26 +1254,31 @@ def _download_named_file(url, path, size, checksum):
         verify(path)
         return str(path)
     part = path.with_name(path.name + '.part')
-    for attempt in range(_MAX_DOWNLOAD_ATTEMPTS):
+    for attempt in range(attempts):
         offset = part.stat().st_size if part.exists() else 0
         if offset > size:
             raise ValueError(f'Oversized partial download: {part}')
         if offset == size:
             break
-        print(f'Downloading {path.name}: attempt {attempt + 1}/{_MAX_DOWNLOAD_ATTEMPTS}, partial {offset}/{size} bytes', flush=True)
+        print(f'Downloading {path.name}: attempt {attempt + 1}/{attempts}, partial {offset}/{size} bytes', flush=True)
         try:
-            with _open_download(url, resume_from=offset, timeout=90) as response:
+            resolved_url = url() if callable(url) else url
+            with _open_download(resolved_url, resume_from=offset, timeout=90) as response:
                 if response.status == 206:
-                    if not response.headers.get('Content-Range', '').startswith(f'bytes {offset}-'):
+                    match = re.fullmatch(r'bytes (\d+)-(\d+)/(\d+)', response.headers.get('Content-Range', ''))
+                    if (not match or int(match[1]) != offset or int(match[3]) != size or
+                            not offset <= int(match[2]) < size):
                         raise ValueError('Unexpected Content-Range')
                 elif response.status == 200:
                     if offset:
+                        if resume_required:
+                            raise ResumeNotSupportedError(f'{path.name}: source ignored Range; partial preserved')
                         print(f'{path.name}: server ignored Range; restarting verified full download', flush=True)
                     offset = 0
                 else:
                     raise ValueError(f'Unexpected HTTP status: {response.status}')
                 with part.open('ab' if offset else 'wb') as output:
-                    while block := response.read(1024 * 1024):
+                    while block := response.read1(1024 * 1024):
                         output.write(block)
                         if output.tell() > size:
                             raise ValueError(f'Oversized download: {part}')
@@ -1244,7 +1287,7 @@ def _download_named_file(url, path, size, checksum):
             raise OSError(f'Truncated response for {path.name}: {part.stat().st_size}/{size} bytes')
         except (OSError, http.client.HTTPException) as error:
             print(f'{path.name}: {error}; incomplete download retained at {part}', flush=True)
-            if attempt == _MAX_DOWNLOAD_ATTEMPTS - 1:
+            if attempt == attempts - 1:
                 raise
             time.sleep(_DOWNLOAD_RETRY_DELAY_S)
     verify(part)
