@@ -49,10 +49,17 @@ relaxation of the time tolerance is performed.
 it delegates to the same `evaluate_files` implementation. Plotting can consume
 saved evo ZIPs without recalculating metrics.
 
-Protocol comparisons also publish PNG/PDF figures under `figures/` next to the
-experiment YAML. The XY trajectory projection uses every saved observed estimate pose,
-transformed by the alignment already stored in the evaluation, and measured GT
-within its time span. Input data/calibration hashes are verified; plots never
+Protocol comparisons publish two PNG/PDF sheets per sequence under `figures/`:
+`*_trajectories` shows the XY route; `*_errors` shows all four position/orientation
+APE/RPE curves and a table with four RMSE values, association coverage, matched/saved
+pose counts and statuses, including failures. Pages contain at most four runs
+(method/repetition pairs); larger matrices use `_pNN` suffixes with shared axis
+limits and stable colors across pages. The complete per-sequence table is also
+saved as `*_summary.csv`.
+
+The route sheet shows the full GT in gray, the common evaluated section dashed,
+and every saved observed estimate pose, transformed by the alignment already
+stored in the evaluation. Input data/calibration hashes are verified; plots never
 refit alignment or interpolate observations. Error curves read cached evo ZIPs;
-RPE all-pairs samples are scatter points. XY axes use equal metric scale. Summary figures include failures
-and association coverage. `manifest.json` records the source evaluations.
+RPE all-pairs samples are scatter points. XY axes use equal metric scale.
+`manifest.json` records the source evaluations and generated sheets.
