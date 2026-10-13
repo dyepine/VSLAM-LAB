@@ -1235,6 +1235,10 @@ def _download_named_file(url, path, size, checksum, *, resume_required=False,
     """
     import hashlib
     import re
+    from tqdm import tqdm
+    progress_options = dict(unit='B', unit_scale=True, unit_divisor=1024,
+                            dynamic_ncols=True, mininterval=0.25,
+                            file=sys.stderr, disable=not sys.stderr.isatty())
     if not size or not checksum:
         raise ValueError('Named downloads require expected size and checksum')
     if not isinstance(attempts, int) or attempts < 1:
@@ -1244,9 +1248,11 @@ def _download_named_file(url, path, size, checksum, *, resume_required=False,
         if candidate.stat().st_size != size:
             raise ValueError(f'Truncated or oversized download: {candidate}')
         h = hashlib.new(algorithm)
-        with candidate.open('rb') as stream:
+        with candidate.open('rb') as stream, tqdm(total=size, desc=f'Check {algorithm}: {path.name}',
+                                                 **progress_options) as progress:
             for block in iter(lambda: stream.read(8 * 1024 * 1024), b''):
                 h.update(block)
+                progress.update(len(block))
         if h.hexdigest() != expected:
             raise ValueError(f'Checksum mismatch: {candidate}; preserved')
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1282,11 +1288,13 @@ def _download_named_file(url, path, size, checksum, *, resume_required=False,
                     offset = 0
                 else:
                     raise ValueError(f'Unexpected HTTP status: {response.status}')
-                with part.open('ab' if offset else 'wb') as output:
+                with part.open('ab' if offset else 'wb') as output, \
+                        tqdm(total=size, initial=offset, desc=path.name, **progress_options) as progress:
                     while block := response.read1(1024 * 1024):
                         output.write(block)
                         if output.tell() > size:
                             raise ValueError(f'Oversized download: {part}')
+                        progress.update(len(block))
             if part.stat().st_size == size:
                 break
             raise OSError(f'Truncated response for {path.name}: {part.stat().st_size}/{size} bytes')
@@ -1299,4 +1307,5 @@ def _download_named_file(url, path, size, checksum, *, resume_required=False,
             time.sleep(_DOWNLOAD_RETRY_DELAY_S)
     verify(part)
     part.replace(path)
+    print(f'{path.name}: download complete, {algorithm} verified', flush=True)
     return str(path)
