@@ -31,8 +31,8 @@ def validate_protocol(settings):
     if unknown:
         raise ValueError(f'Unknown Evaluation settings: {sorted(unknown)}')
     protocol = dict(DEFAULT_PROTOCOL, **settings)
-    if protocol['align'] not in ('SE3', 'none') or protocol['correct_scale'] is not False:
-        raise ValueError('Use align: SE3/none and correct_scale: false for metric VIO')
+    if protocol['align'] not in ('SE3', 'origin', 'none') or protocol['correct_scale'] is not False:
+        raise ValueError('Use align: SE3/origin/none and correct_scale: false for metric VIO')
     if protocol['estimate_frame'] not in ('camera', 'body') or not isinstance(protocol['camera'], str):
         raise ValueError('Invalid estimate frame/camera')
     if type(protocol['evaluate_orientation']) is not bool:
@@ -94,6 +94,8 @@ def calculate(estimate, reference, protocol, interval_boundaries=()):
     if protocol['align'] == 'SE3':
         r, t, _ = estimate.align(reference, correct_scale=False)
         transform[:3, :3], transform[:3, 3] = r, t
+    elif protocol['align'] == 'origin':
+        transform = estimate.align_origin(reference)
     groups = segments(reference, estimate, protocol['max_pose_gap_s'])
     for boundary in interval_boundaries:
         groups = [part for group in groups for part in
@@ -160,8 +162,8 @@ def evaluate_files(trajectory, gt, calibration, evaluation_root, protocol, prove
     output = trajectory.parent
     est_ns, est_values = read_pose_csv(trajectory)
     gt_ns, gt_values = read_pose_csv(gt)
-    if protocol['evaluate_orientation'] and np.allclose(gt_values[:, 3:], [0, 0, 0, 1]):
-        raise ValueError('Identity-only GT orientations: verify reference or disable orientation evaluation explicitly')
+    if (protocol['evaluate_orientation'] or protocol['align'] == 'origin') and np.allclose(gt_values[:, 3:], [0, 0, 0, 1]):
+        raise ValueError('Identity-only GT orientations: verify reference; origin alignment requires pose orientations')
     if protocol['gt_valid_intervals_ns'] is not None:
         mask = np.zeros(len(gt_ns), dtype=bool)
         for start, end in protocol['gt_valid_intervals_ns']:
