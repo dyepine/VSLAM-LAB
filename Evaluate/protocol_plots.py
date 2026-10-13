@@ -91,14 +91,25 @@ def plot_comparison(table):
                           for i, row in enumerate(rows)}
         # Each method keeps the alignment fitted in its own evaluation.
         fig, ax = plt.subplots(figsize=(10, 7), layout='constrained')
-        for label, summary, _, estimate, reference in available:
-            for trajectory, color, style, legend in [
-                (reference, color_by_label[label], '--', f'GT ({label})'),
-                (estimate, color_by_label[label], '-', label)]:
-                for part, ids in enumerate(segments(trajectory.timestamps, summary)):
-                    ax.plot(trajectory.positions_xyz[ids, 0], trajectory.positions_xyz[ids, 1],
-                            color=color, linestyle=style, linewidth=1.2,
-                            label=legend if part==0 else None)
+        # One measured GT over the union of the methods' saved-pose time spans.
+        if len({summary['groundtruth_sha256'] for _, summary, *_ in available}) != 1:
+            raise ValueError('Cannot draw a shared GT for different reference trajectories')
+        gt_origin = min(summary['time_origin_ns'] for _, summary, *_ in available)
+        gt_times = np.concatenate([np.rint(reference.timestamps * 1e9).astype(np.int64)
+                                   + summary['time_origin_ns'] - gt_origin
+                                   for _, summary, _, _, reference in available])
+        gt_positions = np.concatenate([reference.positions_xyz for *_, reference in available])
+        times, indices = np.unique(gt_times, return_index=True)
+        gt_positions = gt_positions[indices]
+        gt_summary = dict(available[0][1], time_origin_ns=gt_origin)
+        for part, ids in enumerate(segments(times / 1e9, gt_summary)):
+            ax.plot(gt_positions[ids, 0], gt_positions[ids, 1], color='0.3', linestyle='--',
+                    linewidth=1.5, label='GT' if part==0 else None, zorder=3)
+        for label, summary, _, estimate, _ in available:
+            for part, ids in enumerate(segments(estimate.timestamps, summary)):
+                ax.plot(estimate.positions_xyz[ids, 0], estimate.positions_xyz[ids, 1],
+                        color=color_by_label[label], linewidth=1.2,
+                        label=label if part==0 else None)
         ax.set_xlabel('X [m]')
         ax.set_ylabel('Y [m]')
         ax.set_aspect('equal', adjustable='box')
