@@ -142,7 +142,15 @@ class BotanicgardenDataset(DatasetVSLAMLAB):
         for name, asset in assets.items():
             # Resume an explicitly configured local partial in place rather than
             # requiring manual downloading or creating a second multi-GB copy.
-            destination = local if (local / name).exists() or (local / (name + ".part")).exists() else raw
+            if (local / name).exists():
+                destination = local
+            elif (raw / name).exists():
+                destination = raw
+            else:
+                def partial_size(directory):
+                    partial = directory / (name + ".part")
+                    return partial.stat().st_size if partial.exists() else 0
+                destination = max([raw, local], key=partial_size)
             path = destination / name
             if not verified(path, asset):
                 if path.exists():
