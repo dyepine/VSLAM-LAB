@@ -222,6 +222,7 @@ class Experiment:
         self.config_yaml = VSLAM_LAB_DIR / 'configs' / settings.get('Config', CONFIG_DEFAULT)
         self.ablation_csv = settings.get('Ablation', None)
         self.settings_yaml = settings.get('MethodSettings')
+        self.evaluation = settings.get('Evaluation')
 
 def load_experiments(exp_yaml: str | Path)-> list[Any]:
     exp_yaml = Path(exp_yaml)
@@ -240,6 +241,13 @@ def load_experiments(exp_yaml: str | Path)-> list[Any]:
 def compare_exp(exp_yaml: str | Path) -> None:
 
     experiments = load_experiments(exp_yaml)
+    has_protocol_results = any(exp.log_csv.is_file() and 'evaluation_directory' in read_csv(exp.log_csv).columns
+                               for exp in experiments.values())
+    if has_protocol_results or any(exp.evaluation is not None for exp in experiments.values()):
+        from Evaluate.protocol_sequence import compare_saved
+        destination = compare_saved(experiments, Path(exp_yaml).parent / 'comparison.csv')
+        print(f'Protocol comparison: {destination}')
+        return
 
     comparison_path = os.path.join(VSLAMLAB_EVALUATION, f"comp_{str(os.path.basename(exp_yaml)).replace('.yaml', '')}")
     print_msg(f"\n{SCRIPT_LABEL}", f"Comparing (in {comparison_path}) ...")
@@ -253,23 +261,37 @@ def compare_exp(exp_yaml: str | Path) -> None:
 # eval_exp
 ##################################################################################################################################################
 ##################################################################################################################################################
-def evaluate_exp(exp_yaml: str | Path, overwrite: bool = False) -> None:
-
+def evaluate_exp(exp_yaml: str | Path, overwrite: bool = False, protocol_override=None) -> None:
     experiments = load_experiments(exp_yaml)
+    records = []
     first_evaluation_found = True
-    for [_, exp] in experiments.items():
-        exp_log = read_csv(exp.log_csv)
-        if(not exp_log['EVALUATION'].str.contains('none').any()) and not overwrite:
-            continue
+    for exp in experiments.values():
+        if protocol_override is not None:
+            exp.evaluation = dict(exp.evaluation or {}, **protocol_override)
+        # Protocol evaluations publish immutable versions; never overwrite older results.
+        if exp.evaluation is None:
+            exp_log = read_csv(exp.log_csv)
+            if not exp_log['EVALUATION'].str.contains('none').any() and not overwrite:
+                continue
         with open(exp.config_yaml, 'r') as file:
-            config_file_data = yaml.safe_load(file)
-            for dataset_name, sequence_names in config_file_data.items():
-                dataset = get_dataset(dataset_name)
-                for sequence_name in sequence_names:
-                    if first_evaluation_found:
-                        print_msg(f"\n{SCRIPT_LABEL}", f"Evaluating (in {VSLAMLAB_EVALUATION}) ...")
-                        first_evaluation_found = False
-                    evaluate_sequence(exp, dataset, sequence_name, overwrite)
+            selection = yaml.safe_load(file)
+        for dataset_name, sequences in selection.items():
+            dataset = get_dataset(dataset_name)
+            for sequence in sequences:
+                if first_evaluation_found:
+                    print_msg(f"\n{SCRIPT_LABEL}", f"Evaluating (in {VSLAMLAB_EVALUATION}) ...")
+                    first_evaluation_found = False
+                evaluated = evaluate_sequence(exp, dataset, sequence, overwrite)
+                if evaluated is not None:
+                    records.extend(evaluated)
+    if records:
+        from Evaluate.protocol_sequence import write_comparison
+        destination = write_comparison(records, Path(exp_yaml).parent / 'comparison.csv')
+        print(f'Protocol comparison: {destination}')
+        failed = [row for row in records if row['status'] != 'evaluated']
+        if failed:
+            raise RuntimeError(f'{len(failed)} runs could not be evaluated; see {destination}')
+
 
 ##################################################################################################################################################
 # run_exp
