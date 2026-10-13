@@ -195,6 +195,17 @@ class GrandtourDataset(DatasetVSLAMLAB):
         # Get Hugging Face repo id
         self.hf_repo_id: str = self.cfg["hf_repo_id"]
 
+    def check_sequence_integrity(self, sequence_name, verbose=False):
+        if (self.sequence_path(sequence_name) / ".import_pending").exists():
+            return False
+        return super().check_sequence_integrity(sequence_name, verbose)
+
+    def check_sequence_availability(self, sequence_name, verbose=True):
+        # Imports started by this adapter are resumable without removing user data.
+        if (self.sequence_path(sequence_name) / ".import_pending").exists():
+            return "non-available"
+        return super().check_sequence_availability(sequence_name, verbose)
+
     # ---- per-sequence layout helpers (each recomputed from sequence_name, never cached on self) ----
     def _mission(self, sequence_name: str) -> str:
         return MISSIONS[sequence_name]
@@ -277,6 +288,8 @@ class GrandtourDataset(DatasetVSLAMLAB):
         # every tarball is extracted, is what makes a retry after a dropped connection resume
         # rather than be skipped. hf_hub_download itself resumes partial files.
         sequence_path = self.sequence_path(sequence_name)
+        sequence_path.mkdir(parents=True, exist_ok=True)
+        (sequence_path / ".import_pending").touch()
         marker = sequence_path / ".download_complete"
         if marker.exists():
             return
@@ -304,7 +317,8 @@ class GrandtourDataset(DatasetVSLAMLAB):
         sequence_path = self.sequence_path(sequence_name)
         for i, (image_tag, _) in enumerate(self.CAMERAS):
             rgb_path = self.rgb_path(sequence_name) if i == 0 else sequence_path / f"rgb_{i}"
-            if rgb_path.exists():
+            marker = sequence_path / f".rgb_complete_{i}"
+            if marker.exists():
                 continue
             source_dir = self._image_dir(sequence_name, image_tag)
             rgb_path.mkdir(parents=True, exist_ok=True)
@@ -317,6 +331,7 @@ class GrandtourDataset(DatasetVSLAMLAB):
                     resized = img.resize(target_size, Image.Resampling.LANCZOS)
                     save_kwargs = {"quality": 95} if raw_image.suffix.lower() in (".jpg", ".jpeg") else {}
                     resized.save(rgb_path / raw_image.name, **save_kwargs)
+            marker.touch()
 
     def create_rgb_csv(self, sequence_name: str) -> None:
         # Each camera's zarr timestamp array is index-aligned with its decoded frames (frame k is
@@ -405,6 +420,7 @@ class GrandtourDataset(DatasetVSLAMLAB):
         # or across the two rig splits, which keep separate benchmark folders).
         if BENCHMARK_RETENTION == Retention.MINIMAL:
             shutil.rmtree(mission_path, ignore_errors=True)
+        (self.sequence_path(sequence_name) / ".import_pending").unlink(missing_ok=True)
 
 
 class GrandtourAlphasenseDataset(GrandtourDataset):

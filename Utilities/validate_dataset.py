@@ -435,7 +435,8 @@ def check_readme_row(yaml_data: dict | None, readme_path: Path) -> None:
     # Find the row containing the dataset label
     row = None
     for line in readme.splitlines():
-        if f"`{dataset_name}`" in line and line.strip().startswith("|"):
+        if ((f"`{dataset_name}`" in line and line.strip().startswith("|")) or
+                (f"<code>{dataset_name}</code>" in line and line.strip().startswith("<tr>"))):
             row = line
             break
 
@@ -448,7 +449,7 @@ def check_readme_row(yaml_data: dict | None, readme_path: Path) -> None:
     # Expand shorthand notations like mono(-vi) -> mono, mono-vi
     import re
     expanded_modes: set[str] = set()
-    for m in re.findall(r"`([^`]+)`", row):
+    for m in re.findall(r"`([^`]+)`", row.replace("<code>", "`").replace("</code>", "`")):
         if "(-vi)" in m:
             base = m.replace("(-vi)", "")
             expanded_modes.add(base)
