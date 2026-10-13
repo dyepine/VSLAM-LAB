@@ -1,0 +1,40 @@
+test_exp_botanicgarden_mono_orbslam3:
+  Config: test_config_botanicgarden.yaml
+  NumRuns: 1
+  Parameters:
+    verbose: 1
+    mode: mono
+    rgb_idx:
+    - 0
+    - 200
+  Module: orbslam3
+test_exp_botanicgarden_mono-vi_orbslam3:
+  Config: test_config_botanicgarden.yaml
+  NumRuns: 1
+  Parameters:
+    verbose: 1
+    mode: mono-vi
+    rgb_idx:
+    - 0
+    - 200
+  Module: orbslam3
+test_exp_botanicgarden_stereo_orbslam3:
+  Config: test_config_botanicgarden.yaml
+  NumRuns: 1
+  Parameters:
+    verbose: 1
+    mode: stereo
+    rgb_idx:
+    - 0
+    - 200
+  Module: orbslam3
+test_exp_botanicgarden_stereo-vi_orbslam3:
+  Config: test_config_botanicgarden.yaml
+  NumRuns: 1
+  Parameters:
+    verbose: 1
+    mode: stereo-vi
+    rgb_idx:
+    - 0
+    - 200
+  Module: orbslam3
