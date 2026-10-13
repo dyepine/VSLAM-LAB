@@ -48,15 +48,8 @@ def evaluate_sequence(exp, dataset, sequence):
             summary = json.loads((destination / 'summary.json').read_text())
             update_evaluation_log(exp.log_csv, dataset.dataset_name, str(sequence), iteration,
                                   destination, summary)
-            record.update(status='evaluated', evaluation_directory=str(destination),
-                          matched_fraction_of_saved_poses=summary['matched_fraction_of_saved_poses'],
-                          estimate_poses=summary['estimate_poses'], matched_pairs=summary['matched_pairs'],
-                          unique_matched_estimate_poses=summary['unique_matched_estimate_poses'],
-                          max_matched_time_difference_s=summary['max_matched_time_difference_s'])
-            for metric, stats in summary['metrics'].items():
-                record[metric + '_rmse'] = stats['rmse']
-                record[metric + '_samples'] = summary['metric_sample_counts'][metric]
-            record['unavailable_metrics'] = json.dumps(summary['unavailable_metrics'])
+            record.update(status='evaluated', evaluation_directory=str(destination))
+            record.update(metric_columns(summary))
         except Exception as error:
             # Preserve failures as comparison rows and continue through all repetitions.
             record.update(status='evaluation_failed', error=f'{type(error).__name__}: {error}')
@@ -64,6 +57,17 @@ def evaluate_sequence(exp, dataset, sequence):
                                   None, None, error=record['error'])
         records.append(record)
     return records
+
+
+def metric_columns(summary):
+    columns = {key: summary[key] for key in (
+        'matched_fraction_of_saved_poses', 'estimate_poses', 'matched_pairs',
+        'unique_matched_estimate_poses', 'unique_matched_gt_poses', 'max_matched_time_difference_s')}
+    for metric, stats in summary['metrics'].items():
+        columns[metric + '_rmse'] = stats['rmse']
+        columns[metric + '_samples'] = summary['metric_sample_counts'][metric]
+    columns['unavailable_metrics'] = json.dumps(summary['unavailable_metrics'])
+    return columns
 
 
 def write_comparison(records, destination):
@@ -105,12 +109,7 @@ def compare_saved(experiments, destination):
                 record.update(status='evaluated', evaluation_directory=str(directory),
                               align=protocol['align'], correct_scale=protocol['correct_scale'],
                               estimate_frame=protocol['estimate_frame'],
-                              max_time_difference_s=protocol['max_time_difference_s'],
-                              matched_fraction_of_saved_poses=summary['matched_fraction_of_saved_poses'],
-                              matched_pairs=summary['matched_pairs'], estimate_poses=summary['estimate_poses'])
-                for metric, stats in summary['metrics'].items():
-                    record[metric + '_rmse'] = stats['rmse']
-                    record[metric + '_samples'] = summary['metric_sample_counts'][metric]
-                record['unavailable_metrics'] = json.dumps(summary['unavailable_metrics'])
+                              max_time_difference_s=protocol['max_time_difference_s'])
+                record.update(metric_columns(summary))
             records.append(record)
     return write_comparison(records, destination)
