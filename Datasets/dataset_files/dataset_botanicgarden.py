@@ -65,14 +65,22 @@ def stereo_pairs(left, right, tolerance_ns):
     return rows
 
 
+def asset_checksum(asset):
+    for algorithm in ("md5", "sha256"):
+        if algorithm in asset:
+            return f"{algorithm}:{asset[algorithm]}"
+    raise ValueError("Source asset requires a published checksum")
+
+
 def verified(path, asset):
     if not path.is_file() or path.stat().st_size != asset["size"]:
         return False
-    h = hashlib.md5()
+    algorithm, expected = asset_checksum(asset).split(":", 1)
+    h = hashlib.new(algorithm)
     with path.open("rb") as f:
         for block in iter(lambda: f.read(8 * 1024 * 1024), b""):
             h.update(block)
-    if h.hexdigest() != asset["md5"]:
+    if h.hexdigest() != expected:
         raise ValueError(f"Checksum mismatch: {path}; file preserved")
     return True
 
@@ -157,7 +165,7 @@ class BotanicgardenDataset(DatasetVSLAMLAB):
                     raise ValueError(f"Incomplete source: {path}; resume download before importing")
                 providers[name] = "onedrive"
                 download_onedrive_file(asset["onedrive"], str(destination), asset["size"],
-                                       filename=name, checksum="md5:" + asset["md5"])
+                                       filename=name, checksum=asset_checksum(asset))
             else:
                 providers[name] = "local_verified"
             paths[name] = str(path.resolve())
