@@ -1,0 +1,79 @@
+dataset_name: botanicgarden
+rgb_hz: 10.0
+modes:
+- mono
+- mono-vi
+- stereo
+- stereo-vi
+cam_models:
+- radtan4
+raw_formats:
+- ros1
+- zip
+sequence_names:
+- '1018_00'
+- '1018_13'
+mirror_root: https://scidata.sjtu.edu.cn/api/records/kfjy8-ex881/files
+calibration_root: https://raw.githubusercontent.com/robot-pesg/BotanicGarden/84c4806428ca16c154238e263a7f8bf828bf58e1/calib
+calibration_files:
+  camera_intrinsics/dalsa_gray0_down.yaml:
+    size: 308
+    git_sha1: 60c32ca3962976c8fbd8449a0c64655ad5a22926
+  camera_intrinsics/dalsa_gray1_down.yaml:
+    size: 308
+    git_sha1: a3dc10385423915b3ce8e0d6d46d218a09195256
+  extrinsics/calib_chain.yaml:
+    size: 6026
+    git_sha1: 068918920648949cc0657c00556afcfcbff518db
+  extrinsics/seq_extrinsics.yaml:
+    size: 3075
+    git_sha1: 37266752dc2207dda6d39c923b20c9e9c78f62d0
+  imu_intrinsics/xsens_imu_param.yaml:
+    size: 568
+    git_sha1: abf804bd89feec58691c4e02805a6432ddc36931
+bags:
+  '1018_00':
+    size: 5826482733
+    md5: 3c1d2e5216c0a20629e0bd6d5fef5575
+  '1018_13':
+    size: 9453894870
+    md5: 50ad55dc11d80c519f964a80dbeedf82
+groundtruth:
+  size: 2391626
+  md5: 9620b47d36ad9f57beb28d7b4687e04f
+about:
+  license: Academic purposes; no explicit license in pinned source
+  summary: Stereo, Xsens IMU and surveyed-map reference in a botanic garden
+  homepage: https://github.com/robot-pesg/BotanicGarden
+  features:
+  - Real
+  - Outdoor
+  authors:
+  - Yuanzhi Liu
+  - Yujia Fu
+  - Minghui Qin
+  - Yufeng Xu
+  - Baoxin Xu
+  - Fengdong Chen
+  - Bart Goossens
+  - Poly Z.H. Sun
+  - Hongwei Yu
+  - Chun Liu
+  - Long Chen
+  - Wei Tao
+  - Hui Zhao
+  access: Public
+  publication: 'BotanicGarden: A High-Quality Dataset for Robot Navigation in Unstructured
+    Natural Environments'
+  publication_url: https://doi.org/10.1109/LRA.2024.3359548
+  year: 2024
+  bibtex_key: liu2023botanicgarden
+  bibtex: '@article{liu2023botanicgarden, title={BotanicGarden: A High-Quality Dataset
+    for Robot Navigation in Unstructured Natural Environments}, author={Liu, Yuanzhi
+    and others}, journal={IEEE Robotics and Automation Letters}, year={2024}, volume={9},
+    number={3}, pages={2798--2805}, doi={10.1109/LRA.2024.3359548}}'
+vslamlab_maintainer:
+  name: vio_research
+  assisted_by: Codex
+  email: N/A
+  date: '2026-10-13'
