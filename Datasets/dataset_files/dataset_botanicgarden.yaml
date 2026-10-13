@@ -11,6 +11,14 @@ raw_formats:
 - ros1
 - zip
 sequence_names:
+- '1005_00'
+- '1005_01'
+- '1005_05'
+- '1005_07'
+- '1006_01'
+- '1006_03'
+- '1008_01'
+- '1008_03'
 - '1018_00'
 - '1018_13'
 calibration_root: https://raw.githubusercontent.com/robot-pesg/BotanicGarden/84c4806428ca16c154238e263a7f8bf828bf58e1/calib
@@ -31,6 +39,38 @@ calibration_files:
     size: 568
     git_sha1: abf804bd89feec58691c4e02805a6432ddc36931
 bags:
+  '1005_00':
+    size: 32319311357
+    md5: 49d45853bc0fca326120fffe281badd3
+    onedrive: https://1drv.ms/u/c/8775740a3f2ddefb/EfveLT8KdHUggIeMAAAAAAABEvpTotVSjnj7bzHdINeAdw?e=4xRYLD
+  '1005_01':
+    size: 24970757436
+    md5: 9aed8283836ac148359532e52a0887dd
+    onedrive: https://1drv.ms/u/c/8775740a3f2ddefb/EfveLT8KdHUggIeLAAAAAAABLgP0WEkdZ_zRGdzOcEra5Q?e=anXvcm
+  '1005_05':
+    size: 33777656281
+    sha256: d15adbbf7582e6c9fb95da709f29c916fb7b3533c91b88b1c54acaaa08c6c6db
+    onedrive: https://1drv.ms/u/s!AhA4pMEcWxdkgsZGQjHQYLu9U_twAQ?e=AacAQB
+  '1005_07':
+    size: 29704832258
+    md5: eb8ace84af1fb47a5bb78392acb6ae1f
+    onedrive: https://1drv.ms/u/c/8775740a3f2ddefb/EfveLT8KdHUggIeKAAAAAAABIG0-k7X35N42c1KFQ63CAA?e=Md93KO
+  '1006_01':
+    size: 40152365227
+    md5: cb427d7aac23fb03d35ee435e2b66e5a
+    onedrive: https://1drv.ms/u/c/8775740a3f2ddefb/EfveLT8KdHUggIeOAAAAAAABUpt2PfiX8SfS4qYRZZVQkw?e=ZV1afN
+  '1006_03':
+    size: 31860344568
+    sha256: edca872506cb90afefa649abb84b7427fbbbbb6cb55ff5367e0a093323b95056
+    onedrive: https://1drv.ms/u/s!AhA4pMEcWxdkgsZFO_TRBT8Evie7lA?e=EY42t8
+  '1008_01':
+    size: 36964100410
+    sha256: 881a2896ac3a458238979f07d0df175891bfc60a230e2b57da13d38879bf22f5
+    onedrive: https://1drv.ms/u/s!AhA4pMEcWxdkgsZHnKvMe5kkkfLARQ?e=1TeTkv
+  '1008_03':
+    size: 34328239020
+    md5: c8887c91a3e6d98bb79e3e71843b0b25
+    onedrive: https://1drv.ms/u/c/8775740a3f2ddefb/EfveLT8KdHUggIeSAAAAAAABoVXkZ3Kt7P0e3Ona-TgNZg?e=5cTAMw
   '1018_00':
     size: 5826482733
     md5: 3c1d2e5216c0a20629e0bd6d5fef5575
@@ -40,6 +80,38 @@ bags:
     md5: 50ad55dc11d80c519f964a80dbeedf82
     onedrive: https://1drv.ms/u/c/8775740a3f2ddefb/EfveLT8KdHUggIeRAAAAAAABMhPIf00oEQFuuJ-jrhG8Rg?e=nTQEMs
 groundtruth_bags:
+  '1005_00':
+    size: 812080
+    md5: 425c3a5a45c526127f66f38dcc648f95
+    onedrive: https://1drv.ms/u/s!AhA4pMEcWxdkgsg9bHdsbNx2zh67oA?e=Nw6XaW
+  '1005_01':
+    size: 639998
+    md5: fb9cf373c3d26911c91ddfa27de92977
+    onedrive: https://1drv.ms/u/s!AhA4pMEcWxdkgsg-fJk5tKHF-Edw0A?e=DdFgiR
+  '1005_05':
+    size: 861147
+    md5: 363f1f176a330d929b115438500e9687
+    onedrive: https://1drv.ms/u/s!AhA4pMEcWxdkgsgwphhKViT2sWniRg?e=mcPXj5
+  '1005_07':
+    size: 753839
+    md5: 5814ebb3ab200028a3826ae74244e1b0
+    onedrive: https://1drv.ms/u/s!AhA4pMEcWxdkgshA-DUPky8ZkG_zJg?e=l5nCdN
+  '1006_01':
+    size: 1025804
+    md5: f8f932485a93c7954fbdf3c34ea836a6
+    onedrive: https://1drv.ms/u/s!AhA4pMEcWxdkgsg58n-nd2U338eGOQ?e=pTCRSg
+  '1006_03':
+    size: 834042
+    md5: b7f449d1b43ae44680aaf17fbf7ca93c
+    onedrive: https://1drv.ms/u/s!AhA4pMEcWxdkgsgxS8cTOqj67NXJzg?e=9McHbe
+  '1008_01':
+    size: 933508
+    md5: fb6c22de3835e0ddb619fa22d14323a0
+    onedrive: https://1drv.ms/u/s!AhA4pMEcWxdkgsg0SmKm5wbYUVAKjA?e=yeaxJo
+  '1008_03':
+    size: 862398
+    md5: bf63c43a750e0755d059f709d571c91b
+    onedrive: https://1drv.ms/u/s!AhA4pMEcWxdkgsg3KPjKZMVKTutw-A?e=YH0tZh
   '1018_00':
     size: 188248
     md5: ed0e99e2696574a8c4b8a6ae1616d0d4
@@ -84,3 +156,14 @@ vslamlab_maintainer:
   assisted_by: Codex
   email: N/A
   date: '2026-10-13'
+durations_s:
+  '1005_00': 583.779
+  '1005_01': 458.914
+  '1005_05': 619.383
+  '1005_07': 541.519
+  '1006_01': 738.701
+  '1006_03': 599.715
+  '1008_01': 671.73
+  '1008_03': 620.29
+  '1018_00': 131.118
+  '1018_13': 195.366
