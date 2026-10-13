@@ -8,7 +8,6 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
 from evo.tools import file_interface
 from Evaluate.trajectory_inputs import read_pose_csv, to_evo, camera_to_body
 
@@ -91,29 +90,21 @@ def plot_comparison(table):
         color_by_label = {f"{row['experiment']} / repeat {int(row['iteration']) + 1}": colors[i % 10]
                           for i, row in enumerate(rows)}
         # Each method keeps the alignment fitted in its own evaluation.
-        fig = plt.figure(figsize=(14, 11), layout='constrained')
-        axes = [fig.add_subplot(2, 2, index+1, projection='3d' if index==3 else None)
-                for index in range(4)]
-        for index, (label, summary, _, estimate, reference) in enumerate(available):
-            for ax, dimensions, plane in zip(axes, [(0,1), (0,2), (1,2), (0,1,2)], ['XY','XZ','YZ','3D (axis scales differ)']):
-                for trajectory, color, style, legend in [
-                    (reference, color_by_label[label], '--', f'GT ({label})'),
-                    (estimate, color_by_label[label], '-', label)]:
-                    for part, ids in enumerate(segments(trajectory.timestamps, summary)):
-                        coordinates = [trajectory.positions_xyz[ids, dim] for dim in dimensions]
-                        ax.plot(*coordinates, color=color, linestyle=style, linewidth=1.2,
-                                label=legend if part==0 else None)
-                ax.set_title(plane)
-                ax.set_xlabel('XYZ'[dimensions[0]] + ' [m]')
-                ax.set_ylabel('XYZ'[dimensions[1]] + ' [m]')
-                if len(dimensions)==2: ax.set_aspect('equal', adjustable='datalim')
-                else:
-                    ax.set_zlabel('Z [m]', labelpad=8)
-                    ax.set_box_aspect((1, 1, .8))
-                    for axis in [ax.xaxis, ax.yaxis, ax.zaxis]: axis.set_major_locator(MaxNLocator(4))
-                ax.grid(alpha=.25)
-        axes[0].legend(fontsize=8)
-        fig.suptitle(f'{dataset} / {sequence}: saved body poses; per-run alignment; GT over saved-pose span')
+        fig, ax = plt.subplots(figsize=(10, 7), layout='constrained')
+        for label, summary, _, estimate, reference in available:
+            for trajectory, color, style, legend in [
+                (reference, color_by_label[label], '--', f'GT ({label})'),
+                (estimate, color_by_label[label], '-', label)]:
+                for part, ids in enumerate(segments(trajectory.timestamps, summary)):
+                    ax.plot(trajectory.positions_xyz[ids, 0], trajectory.positions_xyz[ids, 1],
+                            color=color, linestyle=style, linewidth=1.2,
+                            label=legend if part==0 else None)
+        ax.set_xlabel('X [m]')
+        ax.set_ylabel('Y [m]')
+        ax.set_aspect('equal', adjustable='box')
+        ax.grid(alpha=.25)
+        ax.legend(fontsize=9)
+        ax.set_title(f'{dataset} / {sequence}: XY trajectory')
         save_figure(fig, output / (tag + '_trajectories'))
 
         fig, axes = plt.subplots(2, 2, figsize=(14, 9), layout='constrained')
