@@ -48,3 +48,12 @@ relaxation of the time tolerance is performed.
 `protocol.evaluate_run` retains support for previously saved research artifacts;
 it delegates to the same `evaluate_files` implementation. Plotting can consume
 saved evo ZIPs without recalculating metrics.
+
+Protocol comparisons also publish PNG/PDF figures under `figures/` next to the
+experiment YAML. Trajectory projections use every saved observed estimate pose,
+transformed by the alignment already stored in the evaluation, and measured GT
+within its time span. Input data/calibration hashes are verified; plots never
+refit alignment or interpolate observations. Error curves read cached evo ZIPs;
+RPE all-pairs samples are scatter points. 2D axes use equal metric scale, while
+3D explicitly labels independent axis scales. Summary figures include failures
+and association coverage. `manifest.json` records the source evaluations.
