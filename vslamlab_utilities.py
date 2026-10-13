@@ -221,6 +221,7 @@ class Experiment:
         self.log_csv = self.folder / 'vslamlab_exp_log.csv'
         self.config_yaml = VSLAM_LAB_DIR / 'configs' / settings.get('Config', CONFIG_DEFAULT)
         self.ablation_csv = settings.get('Ablation', None)
+        self.settings_yaml = settings.get('MethodSettings')
 
 def load_experiments(exp_yaml: str | Path)-> list[Any]:
     exp_yaml = Path(exp_yaml)
@@ -300,6 +301,8 @@ def run_exp(exp_yaml: str | Path) -> None:
             first_not_finished_experiment = exp_log[exp_log["STATUS"] != "completed"].index.min()
             row = exp_log.loc[first_not_finished_experiment]
             baseline = get_baseline(row['method_name'])
+            if exp.settings_yaml is not None:
+                baseline.settings_yaml = Path(exp.settings_yaml)
             dataset = get_dataset(row['dataset_name'])
 
             if num_executed_runs == 0:
