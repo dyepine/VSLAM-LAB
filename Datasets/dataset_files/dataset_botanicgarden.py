@@ -18,7 +18,7 @@ from scipy.spatial.transform import Rotation
 
 from Datasets.DatasetVSLAMLAB import DatasetVSLAMLAB
 from path_constants import VSLAM_LAB_DIR
-from utilities import (downloadFile, download_onedrive_file, ResumeNotSupportedError,
+from utilities import (downloadFile, download_onedrive_file,
                        run_rosbag_frame_extraction, write_csv_rows)
 
 
@@ -131,7 +131,7 @@ class BotanicgardenDataset(DatasetVSLAMLAB):
         local = Path(os.environ.get("BOTANICGARDEN_SOURCE_DIR", str(raw)))
         assets = {
             f"{sequence_name}_VLIO.bag": self.cfg["bags"][sequence_name],
-            "GT_pose_qnew.zip": self.cfg["groundtruth"],
+            f"gt_{sequence_name}_qnew.bag": self.cfg["groundtruth_bags"][sequence_name],
         }
         paths = {}
         providers = {}
@@ -155,22 +155,9 @@ class BotanicgardenDataset(DatasetVSLAMLAB):
             if not verified(path, asset):
                 if path.exists():
                     raise ValueError(f"Incomplete source: {path}; resume download before importing")
-                share = asset.get("onedrive")
-                providers[name] = "sjtu"
-                try:
-                    downloadFile(
-                        self.cfg["mirror_root"] + "/" + name + "/content",
-                        str(destination), asset["size"], filename=name,
-                        checksum="md5:" + asset["md5"], resume_required=bool(share),
-                        attempts=1 if share else 10,
-                    )
-                except (ResumeNotSupportedError, OSError):
-                    if not share:
-                        raise
-                    print(f"{name}: mirror cannot complete transfer; switching to official OneDrive with resume", flush=True)
-                    download_onedrive_file(share, str(destination), asset["size"],
-                                           filename=name, checksum="md5:" + asset["md5"])
-                    providers[name] = "onedrive"
+                providers[name] = "onedrive"
+                download_onedrive_file(asset["onedrive"], str(destination), asset["size"],
+                                       filename=name, checksum="md5:" + asset["md5"])
             else:
                 providers[name] = "local_verified"
             paths[name] = str(path.resolve())
@@ -190,7 +177,6 @@ class BotanicgardenDataset(DatasetVSLAMLAB):
                 {
                     "files": paths,
                     "download_providers": providers,
-                    "mirror_root": self.cfg["mirror_root"],
                     "calibration_root": self.cfg["calibration_root"],
                     "checksums": assets,
                 },
@@ -295,11 +281,16 @@ class BotanicgardenDataset(DatasetVSLAMLAB):
         folder = self.sequence_path(sequence_name)
         bag = self._raw() / f"gt_{sequence_name}_qnew.bag"
         if not bag.exists():
-            with zipfile.ZipFile(self._source(sequence_name, "GT_pose_qnew.zip")) as z:
-                content = z.read(f"GT_pose_qnew/gt_{sequence_name}_qnew.bag")
-                temporary = bag.with_suffix(".bag.tmp")
-                temporary.write_bytes(content)
-                temporary.replace(bag)
+            sources = json.loads((folder / "sources.json").read_text())["files"]
+            if bag.name in sources:
+                bag = Path(sources[bag.name])
+            else:
+                # Imports started before direct OneDrive delivery used the corrected ZIP.
+                with zipfile.ZipFile(self._source(sequence_name, "GT_pose_qnew.zip")) as z:
+                    content = z.read(f"GT_pose_qnew/gt_{sequence_name}_qnew.bag")
+                    temporary = bag.with_suffix(".bag.tmp")
+                    temporary.write_bytes(content)
+                    temporary.replace(bag)
         raw_csv = folder / "groundtruth_vlp16.csv"
         self._ros("extract_rosbag_poses.py", "--rosbag_path", bag, "--output", raw_csv, "--pose_topic", "/gt_poses")
         with raw_csv.open() as f:
@@ -326,7 +317,7 @@ class BotanicgardenDataset(DatasetVSLAMLAB):
         (folder / "reference_metadata.json").write_text(
             json.dumps(
                 {
-                    "source": "GT_pose_qnew.zip /gt_poses",
+                    "source": f"corrected gt_{sequence_name}_qnew.bag /gt_poses",
                     "rejected_nonfinite_pose_timestamps_ns": rejected_stamps,
                     "body_frame": "Xsens",
                     "source_tracked_frame": "VLP16",

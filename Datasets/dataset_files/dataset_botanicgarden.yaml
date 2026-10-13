@@ -13,7 +13,6 @@ raw_formats:
 sequence_names:
 - '1018_00'
 - '1018_13'
-mirror_root: https://scidata.sjtu.edu.cn/api/records/kfjy8-ex881/files
 calibration_root: https://raw.githubusercontent.com/robot-pesg/BotanicGarden/84c4806428ca16c154238e263a7f8bf828bf58e1/calib
 calibration_files:
   camera_intrinsics/dalsa_gray0_down.yaml:
@@ -40,9 +39,15 @@ bags:
     size: 9453894870
     md5: 50ad55dc11d80c519f964a80dbeedf82
     onedrive: https://1drv.ms/u/c/8775740a3f2ddefb/EfveLT8KdHUggIeRAAAAAAABMhPIf00oEQFuuJ-jrhG8Rg?e=nTQEMs
-groundtruth:
-  size: 2391626
-  md5: 9620b47d36ad9f57beb28d7b4687e04f
+groundtruth_bags:
+  '1018_00':
+    size: 188248
+    md5: ed0e99e2696574a8c4b8a6ae1616d0d4
+    onedrive: https://1drv.ms/u/s!AhA4pMEcWxdkgshCS40IH6Kc2nG22w?e=Gjvwt7
+  '1018_13':
+    size: 276791
+    md5: d64f15d54afdbfc972414947b068185a
+    onedrive: https://1drv.ms/u/s!AhA4pMEcWxdkgshOdqqRCfCdpTvKlw?e=6wVNUK
 about:
   license: Academic purposes; no explicit license in pinned source
   summary: Stereo, Xsens IMU and surveyed-map reference in a botanic garden
