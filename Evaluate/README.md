@@ -11,7 +11,7 @@ example:
   NumRuns: 2
   Parameters: {mode: stereo-vi, verbose: 0}
   Evaluation:
-    align: SE3
+    align: origin
     correct_scale: false
     estimate_frame: camera
     camera: rgb_0
@@ -25,7 +25,12 @@ example:
 `estimate_frame` describes the trajectory export, not the sensor inputs to the
 method. A camera trajectory is right-multiplied by inverse calibration `T_BS`
 exactly once to compare body poses. A body trajectory is used directly. This is
-separate from world-frame SE(3) alignment, which does not correct metric scale.
+separate from world-frame alignment, which does not correct metric scale.
+`align: origin` uses evo's `align_origin` after timestamp association: the first
+matched body pose (position and orientation) is mapped to its GT pose and the same
+transform is applied to the whole trajectory. It does not refit later drift.
+`align: SE3` instead fits all associated positions; `align: none` applies no fit.
+Origin alignment requires a reference with meaningful orientations.
 The reference is expected to contain poses of the calibration's body frame.
 
 All repetitions are processed. Each evaluation publishes an immutable directory
