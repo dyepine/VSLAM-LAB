@@ -1254,13 +1254,18 @@ def _download_named_file(url, path, size, checksum, *, resume_required=False,
         verify(path)
         return str(path)
     part = path.with_name(path.name + '.part')
-    for attempt in range(attempts):
+    failures_without_progress = 0
+    request_count = 0
+    while True:
         offset = part.stat().st_size if part.exists() else 0
         if offset > size:
             raise ValueError(f'Oversized partial download: {part}')
         if offset == size:
             break
-        print(f'Downloading {path.name}: attempt {attempt + 1}/{attempts}, partial {offset}/{size} bytes', flush=True)
+        saved_before = offset
+        request_count += 1
+        print(f'Downloading {path.name}: request {request_count}, failures without progress '
+              f'{failures_without_progress}/{attempts}, partial {offset}/{size} bytes', flush=True)
         try:
             resolved_url = url() if callable(url) else url
             with _open_download(resolved_url, resume_from=offset, timeout=90) as response:
@@ -1287,7 +1292,9 @@ def _download_named_file(url, path, size, checksum, *, resume_required=False,
             raise OSError(f'Truncated response for {path.name}: {part.stat().st_size}/{size} bytes')
         except (OSError, http.client.HTTPException) as error:
             print(f'{path.name}: {error}; incomplete download retained at {part}', flush=True)
-            if attempt == attempts - 1:
+            saved_after = part.stat().st_size if part.exists() else 0
+            failures_without_progress = 0 if saved_after > saved_before else failures_without_progress + 1
+            if failures_without_progress >= attempts:
                 raise
             time.sleep(_DOWNLOAD_RETRY_DELAY_S)
     verify(part)
