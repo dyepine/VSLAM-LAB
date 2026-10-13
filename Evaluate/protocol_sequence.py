@@ -78,6 +78,8 @@ def write_comparison(records, destination):
         writer = csv.DictWriter(stream, fieldnames=headers)
         writer.writeheader()
         writer.writerows(records)
+    from Evaluate.protocol_plots import plot_comparison
+    plot_comparison(destination)
     return destination
 
 
