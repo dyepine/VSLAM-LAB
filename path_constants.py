@@ -28,7 +28,7 @@ ABLATION_PARAMETERS_CSV = 'log_ablation_parameters.csv'
 # Experiment Parameters: keys consumed by the run pipeline itself (Run/run_functions.py) rather than
 # forwarded to the baseline; BaselineVSLAMLAB.build_execute_command warns about any other unknown key.
 EXP_FRAMEWORK_PARAMETERS = ('rgb_csv', 'rgb_idx', 'rgb_step', 'rgb_max', 'rgb_vpr', 'rgb_placecell',
-                            'refraction', 'segmentation', 'depth', 'calibration')
+                            'refraction', 'segmentation', 'depth', 'calibration', 'imu_noise')
 
 TRAJECTORY_FILE_NAME = 'KeyFrameTrajectory'
 SCRIPT_LABEL = f"\033[95m[{os.path.basename(__file__)}]\033[0m "
