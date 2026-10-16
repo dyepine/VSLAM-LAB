@@ -1,0 +1,12 @@
+diff --git a/src/mapManagement.cpp b/src/mapManagement.cpp
+index c593988..847f9d2 100644
+--- a/src/mapManagement.cpp
++++ b/src/mapManagement.cpp
+@@ -62,6 +62,7 @@ bool mapManagement::addPointToVoxel(voxelHashMap &voxel_map, std::shared_ptr<map
+ 
+ 		return true;
+     }
++    return false; // Existing voxel is full; the point was not inserted.
+ }
+ 
+ void mapManagement::changeHostVoxel(voxelHashMap &voxel_map, std::shared_ptr<mapPoint> map_point_ptr, double voxel_size, int max_num_points_in_voxel, 

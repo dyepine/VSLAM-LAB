@@ -1,0 +1,458 @@
+diff --git a/include/mapManagement.h b/include/mapManagement.h
+index ba0afaf..be02962 100644
+--- a/include/mapManagement.h
++++ b/include/mapManagement.h
+@@ -10,8 +10,6 @@
+ #include <Eigen/Core>
+ #include <pcl/point_cloud.h>
+ #include <pcl/point_types.h>
+-#include <pcl_ros/point_cloud.h>
+-#include <pcl_conversions/pcl_conversions.h>
+ 
+ // function include
+ #include "mapPoint.h"
+diff --git a/include/msckf.h b/include/msckf.h
+index 53ea2e5..5888ff3 100644
+--- a/include/msckf.h
++++ b/include/msckf.h
+@@ -10,8 +10,6 @@
+ #include <Eigen/Core>
+ #include <pcl/point_cloud.h>
+ #include <pcl/point_types.h>
+-#include <pcl_ros/point_cloud.h>
+-#include <pcl_conversions/pcl_conversions.h>
+ 
+ // function include
+ #include "state.h"
+diff --git a/include/sensorData.h b/include/sensorData.h
+index fcaceae..2ed1cae 100644
+--- a/include/sensorData.h
++++ b/include/sensorData.h
+@@ -5,7 +5,6 @@
+ #include <vector>
+ 
+ // lib include
+-#include <ros/ros.h>
+ #include <opencv2/opencv.hpp>
+ #include <opencv2/highgui/highgui.hpp>
+ #include <Eigen/Core>
+diff --git a/include/stateHelper.h b/include/stateHelper.h
+index e178082..0e570f6 100644
+--- a/include/stateHelper.h
++++ b/include/stateHelper.h
+@@ -8,8 +8,6 @@
+ #include <Eigen/Core>
+ #include <pcl/point_cloud.h>
+ #include <pcl/point_types.h>
+-#include <pcl_ros/point_cloud.h>
+-#include <pcl_conversions/pcl_conversions.h>
+ 
+ // function include
+ #include "utility.h"
+diff --git a/include/stereoVio.h b/include/stereoVio.h
+index a7a6021..2a3c9f8 100644
+--- a/include/stereoVio.h
++++ b/include/stereoVio.h
+@@ -10,28 +10,15 @@
+ #include <unordered_set>
+ 
+ // lib include
+-#include <ros/ros.h>
+-#include <image_transport/image_transport.h>
+-#include <nav_msgs/Odometry.h>
+-#include <nav_msgs/Path.h>
+-#include <tf/transform_datatypes.h>
+-#include <tf/transform_broadcaster.h>
+-#include <geometry_msgs/Vector3.h>
+-#include <sensor_msgs/Imu.h>
+-#include <cv_bridge/cv_bridge.h>
+-#include <message_filters/subscriber.h>
+-#include <message_filters/sync_policies/approximate_time.h>
+-#include <message_filters/time_synchronizer.h>
+ #include <opencv2/opencv.hpp>
+ #include <opencv2/highgui/highgui.hpp> 
+ #include <Eigen/Core>
+ #include <Eigen/Dense>
+ #include <pcl/point_cloud.h>
+ #include <pcl/point_types.h>
+-#include <pcl_ros/point_cloud.h>
+-#include <pcl_conversions/pcl_conversions.h>
+ 
+ // function include
++#include "fileParameters.h"
+ #include "utility.h"
+ #include "parameters.h"
+ #include "sensorData.h"
+@@ -159,7 +146,16 @@ private:
+ 
+ public:
+ 
+-    voxelStereoVio();
++    explicit voxelStereoVio(const std::string& settings);
++    void feedImu(imuData data) { processImu(data); time_newest_imu = data.timestamp; }
++    void feedStereo(cameraData data) { camera_buffer.push(data); run(); }
++    bool poseAt(double timestamp, Eigen::Matrix4d& T_WI) const {
++        if (!initial_flag || std::abs(timelastupdate - timestamp) > 1e-8) return false;
++        T_WI.setIdentity();
++        T_WI.block<3,3>(0,0) = state_ptr->imu_ptr->getRot().transpose();
++        T_WI.block<3,1>(0,3) = state_ptr->imu_ptr->getPos();
++        return true;
++    }
+ 
+     void readParameters();
+ 
+@@ -167,48 +163,23 @@ public:
+ 
+     void initialValue();
+ 
+-    void imuHandler(const sensor_msgs::Imu::ConstPtr &msg);
+-
+-    void stereoImageHandler(const sensor_msgs::ImageConstPtr &msg_0, const sensor_msgs::ImageConstPtr &msg_1, int cam_0, int cam_1);
+-
+     void run();
+ 
+-    ros::NodeHandle nh;
++    FileParameters nh;
+ 
+     std::string image_left_topic;
+     std::string image_right_topic;
+     std::string imu_topic;
+ 
+-    ros::Subscriber sub_imu;
+-    std::vector<ros::Subscriber> subs_cam;
+-    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> SyncStereoImage;
+-    std::vector<std::shared_ptr<message_filters::Synchronizer<SyncStereoImage>>> sync_cam;
+-    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::Image>>> sync_subs_cam;
+-
+     // display
+     void pubFeatImage(cv::Mat &stereo_image, double &timestamp);
+     void pubOdometry(std::shared_ptr<state> state_ptr, double &timestamp);
+-    void setPoseStamp(geometry_msgs::PoseStamped &body_pose_out, std::shared_ptr<state> state_ptr);
+     void pubPath(std::shared_ptr<state> state_ptr, double &timestamp);
+     void pubHistoryPoints(pcl::PointCloud<pcl::PointXYZRGB>::Ptr points_history, double &timestamp);
+     void pubWindowPoints(std::shared_ptr<state> state_ptr, double &timestamp);
+     void pubHistoryVoxels(pcl::PointCloud<pcl::PointXYZI>::Ptr voxels_history, double &timestamp);
+     void pubVisitVoxels(pcl::PointCloud<pcl::PointXYZI>::Ptr voxels_visit, double &timestamp);
+ 
+-    image_transport::ImageTransport it;
+-    image_transport::Publisher pub_feat_image;
+-
+-    ros::Publisher pub_odom;
+-    ros::Publisher pub_path;
+-    ros::Publisher pub_points_history;
+-    ros::Publisher pub_points_window;
+-    ros::Publisher pub_voxels_history;
+-    ros::Publisher pub_voxels_visit;
+-
+-    geometry_msgs::PoseStamped msg_body_pose;
+-    nav_msgs::Odometry odom;
+-    nav_msgs::Path path;
+-
+     pcl::PointCloud<pcl::PointXYZRGB>::Ptr points_history;
+     pcl::PointCloud<pcl::PointXYZRGB>::Ptr points_window;
+     pcl::PointCloud<pcl::PointXYZI>::Ptr voxels_history;
+diff --git a/include/utility.h b/include/utility.h
+index a1ce1a6..b988704 100644
+--- a/include/utility.h
++++ b/include/utility.h
+@@ -14,6 +14,10 @@
+ 
+ // lib include
+ #include <opencv2/opencv.hpp>
++#include <boost/date_time/posix_time/posix_time.hpp>
++#include <boost/filesystem.hpp>
++#include <iomanip>
++#include <cassert>
+ #include <Eigen/Core>
+ 
+ #define PYR_LEVELS 6
+diff --git a/src/stereoVio.cpp b/src/stereoVio.cpp
+index 7944150..fe8c531 100644
+--- a/src/stereoVio.cpp
++++ b/src/stereoVio.cpp
+@@ -1,33 +1,11 @@
+ #include "stereoVio.h"
+ 
+-voxelStereoVio::voxelStereoVio() : it(nh)
++voxelStereoVio::voxelStereoVio(const std::string& settings) : nh(settings)
+ {
+     readParameters();
+-
+     initialValue();
+-
+     allocateMemory();
+ 
+-    sub_imu = nh.subscribe<sensor_msgs::Imu>(imu_topic, 500, &voxelStereoVio::imuHandler, this);
+-
+-    auto sub_img_left = std::make_shared<message_filters::Subscriber<sensor_msgs::Image>>(nh, image_left_topic, 5);
+-    auto sub_img_right = std::make_shared<message_filters::Subscriber<sensor_msgs::Image>>(nh, image_right_topic, 5);
+-    auto sync = std::make_shared<message_filters::Synchronizer<SyncStereoImage>>(SyncStereoImage(10), *sub_img_left, *sub_img_right);
+-    sync->registerCallback(boost::bind(&voxelStereoVio::stereoImageHandler, this, _1, _2, 0, 1));
+-
+-    sync_cam.push_back(sync);
+-    sync_subs_cam.push_back(sub_img_left);
+-    sync_subs_cam.push_back(sub_img_right);
+-
+-    // display
+-    pub_feat_image = it.advertise("camera/stereo_feat_image", 5);
+-    pub_odom = nh.advertise<nav_msgs::Odometry>("vio/odom", 5);
+-    pub_path = nh.advertise<nav_msgs::Path>("vio/path", 5);
+-    pub_points_history = nh.advertise<sensor_msgs::PointCloud2>("vio/history_map_points", 2);
+-    pub_points_window = nh.advertise<sensor_msgs::PointCloud2>("vio/window_map_points", 2);
+-    pub_voxels_history = nh.advertise<sensor_msgs::PointCloud2>("vio/history_voxels", 2);
+-    pub_voxels_visit = nh.advertise<sensor_msgs::PointCloud2>("vio/visit_voxels", 2);
+-
+     points_history.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+     points_window.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+     voxels_history.reset(new pcl::PointCloud<pcl::PointXYZI>());
+@@ -98,7 +76,7 @@ void voxelStereoVio::readParameters()
+     odometry_options.init_options.init_dyn_bias_g << v_bias_gyr.at(0), v_bias_gyr.at(1), v_bias_gyr.at(2);
+     odometry_options.init_options.init_dyn_bias_a << v_bias_acc.at(0), v_bias_acc.at(1), v_bias_acc.at(2);
+ 
+-    nh.param<double>("initializer_parameter/gravity_mag", para_double, 9.81); odometry_options.init_options.gravity_mag = para_double;
++    nh.param<double>("initializer_parameter/gravity_mag", para_double, 9.81); odometry_options.init_options.gravity_mag = odometry_options.gravity_mag = para_double;
+     nh.param<bool>("initializer_parameter/downsample_cameras", para_bool, false); odometry_options.init_options.downsample_cameras = para_bool;
+  
+     double calib_camimu_dt_left, calib_camimu_dt_right;
+@@ -438,70 +416,6 @@ void voxelStereoVio::initialValue()
+     time_newest_imu = -1;
+ }
+ 
+-void voxelStereoVio::imuHandler(const sensor_msgs::Imu::ConstPtr &msg)
+-{
+-    imuData imu_data;
+-    imu_data.timestamp = msg->header.stamp.toSec();
+-    imu_data.gyr << msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z;
+-    imu_data.acc << msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z;
+-
+-    processImu(imu_data);
+-
+-    time_newest_imu = imu_data.timestamp;
+-}
+-
+-void voxelStereoVio::stereoImageHandler(const sensor_msgs::ImageConstPtr &msg_0, const sensor_msgs::ImageConstPtr &msg_1, int cam_0, int cam_1)
+-{
+-    double timestamp = msg_0->header.stamp.toSec();
+-    double time_delta = 1.0 / odometry_options.track_frequency;
+-
+-    if (camera_last_timestamp.find(cam_0) != camera_last_timestamp.end() && timestamp < camera_last_timestamp.at(cam_0) + time_delta) return;
+-
+-    camera_last_timestamp[cam_0] = timestamp;
+-
+-    cv_bridge::CvImageConstPtr cv_ptr_0;
+-    try
+-    {
+-        cv_ptr_0 = cv_bridge::toCvShare(msg_0, sensor_msgs::image_encodings::MONO8);
+-    }
+-    catch (cv_bridge::Exception &e)
+-    {
+-        std::cout << "cv_bridge exception: " << e.what() << std::endl;
+-        return;
+-    }
+-
+-    cv_bridge::CvImageConstPtr cv_ptr_1;
+-    try
+-    {
+-        cv_ptr_1 = cv_bridge::toCvShare(msg_1, sensor_msgs::image_encodings::MONO8);
+-    }
+-    catch (cv_bridge::Exception &e)
+-    {
+-        std::cout << "cv_bridge exception: " << e.what() << std::endl;
+-        return;
+-    }
+-
+-    cameraData camera_data;
+-    camera_data.timestamp = cv_ptr_0->header.stamp.toSec();
+-    camera_data.camera_ids.push_back(cam_0);
+-    camera_data.camera_ids.push_back(cam_1);
+-    camera_data.images.push_back(cv_ptr_0->image.clone());
+-    camera_data.images.push_back(cv_ptr_1->image.clone());
+-
+-    if (odometry_options.use_mask)
+-    {
+-        camera_data.masks.push_back(odometry_options.masks.at(cam_0));
+-        camera_data.masks.push_back(odometry_options.masks.at(cam_1));
+-    }
+-    else
+-    {
+-        camera_data.masks.push_back(cv::Mat::zeros(cv_ptr_0->image.rows, cv_ptr_0->image.cols, CV_8UC1));
+-        camera_data.masks.push_back(cv::Mat::zeros(cv_ptr_1->image.rows, cv_ptr_1->image.cols, CV_8UC1));
+-    }
+-
+-    camera_buffer.push(camera_data);
+-}
+-
+ void voxelStereoVio::processImu(imuData &imu_data)
+ {
+     double oldest_time = state_ptr->margtimestep();
+@@ -1377,139 +1291,14 @@ void voxelStereoVio::featureUpdate(cameraData &image_measurements)
+ }
+ 
+ // display
+-void voxelStereoVio::pubFeatImage(cv::Mat &stereo_image, double &timestamp)
+-{
+-    if (!stereo_image.empty() && pub_feat_image.getNumSubscribers() > 0)
+-    {
+-        try {
+-            sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", stereo_image).toImageMsg();
+-            msg->header.stamp = ros::Time().fromSec(timestamp);
+-            msg->header.frame_id = "camera_init";
+-            pub_feat_image.publish(msg);
+-        }
+-        catch (cv_bridge::Exception& e) {
+-            ROS_ERROR("cv_bridge exception: %s", e.what());
+-        }
+-    }
+-}
+-
+-void voxelStereoVio::pubOdometry(std::shared_ptr<state> state_ptr, double &timestamp)
+-{
+-    if (pub_odom.getNumSubscribers() > 0)
+-    {
+-        odom.header.frame_id = "camera_init";
+-        odom.child_frame_id = "body";
+-        odom.header.stamp = ros::Time().fromSec(timestamp);
+-        odom.pose.pose.orientation.x = state_ptr->imu_ptr->getQuat()(0);
+-        odom.pose.pose.orientation.y = state_ptr->imu_ptr->getQuat()(1);
+-        odom.pose.pose.orientation.z = state_ptr->imu_ptr->getQuat()(2);
+-        odom.pose.pose.orientation.w = state_ptr->imu_ptr->getQuat()(3);
+-        odom.pose.pose.position.x = state_ptr->imu_ptr->getPos()(0);
+-        odom.pose.pose.position.y = state_ptr->imu_ptr->getPos()(1);
+-        odom.pose.pose.position.z = state_ptr->imu_ptr->getPos()(2);
+-        pub_odom.publish(odom);
+-    }
+-}
+-
+-void voxelStereoVio::setPoseStamp(geometry_msgs::PoseStamped &body_pose_out, std::shared_ptr<state> state_ptr)
+-{
+-    body_pose_out.pose.position.x = state_ptr->imu_ptr->getPos()(0);
+-    body_pose_out.pose.position.y = state_ptr->imu_ptr->getPos()(1);
+-    body_pose_out.pose.position.z = state_ptr->imu_ptr->getPos()(2);
+-    
+-    body_pose_out.pose.orientation.x = state_ptr->imu_ptr->getQuat()(0);
+-    body_pose_out.pose.orientation.y = state_ptr->imu_ptr->getQuat()(1);
+-    body_pose_out.pose.orientation.z = state_ptr->imu_ptr->getQuat()(2);
+-    body_pose_out.pose.orientation.w = state_ptr->imu_ptr->getQuat()(3);
+-}
+-
+-void voxelStereoVio::pubPath(std::shared_ptr<state> state_ptr, double &timestamp)
+-{
+-    if (pub_path.getNumSubscribers() > 0)
+-    {
+-        setPoseStamp(msg_body_pose, state_ptr);
+-        msg_body_pose.header.stamp = ros::Time().fromSec(timestamp);
+-        msg_body_pose.header.frame_id = "camera_init";
+-
+-        static int i = 0;
+-        i++;
+-        if (i % 10 == 0) 
+-        {
+-            path.poses.push_back(msg_body_pose);
+-            path.header.stamp = ros::Time().fromSec(timestamp);
+-            path.header.frame_id ="camera_init";
+-            pub_path.publish(path);
+-        }
+-    }
+-}
+-
+-void voxelStereoVio::pubHistoryPoints(pcl::PointCloud<pcl::PointXYZRGB>::Ptr points_history, double &timestamp)
+-{
+-    if (pub_points_history.getNumSubscribers() > 0)
+-    {
+-        sensor_msgs::PointCloud2 point_cloud_msg;
+-        pcl::toROSMsg(*points_history, point_cloud_msg);
+-        point_cloud_msg.header.stamp = ros::Time().fromSec(timestamp);
+-        point_cloud_msg.header.frame_id = "camera_init";
+-        pub_points_history.publish(point_cloud_msg);
+-    }
+-}
+-
+-void voxelStereoVio::pubWindowPoints(std::shared_ptr<state> state_ptr, double &timestamp)
+-{
+-    points_window->clear();
+-
+-    if (pub_points_window.getNumSubscribers() > 0)
+-    {
+-        auto it0 = state_ptr->map_points.begin();
+-        while (it0 != state_ptr->map_points.end())
+-        {
+-            pcl::PointXYZRGB point_temp;
+-            point_temp.x = (*it0).second->getPointXYZ(false)[0];
+-            point_temp.y = (*it0).second->getPointXYZ(false)[1];
+-            point_temp.z = (*it0).second->getPointXYZ(false)[2];
+-            point_temp.r = (*it0).second->color;
+-            point_temp.g = (*it0).second->color;
+-            point_temp.b = (*it0).second->color;
+-            points_window->points.push_back(point_temp);
+-
+-            it0++;
+-        }
+-
+-        sensor_msgs::PointCloud2 point_cloud_msg;
+-        pcl::toROSMsg(*points_window, point_cloud_msg);
+-        point_cloud_msg.header.stamp = ros::Time().fromSec(timestamp);
+-        point_cloud_msg.header.frame_id = "camera_init";
+-        pub_points_window.publish(point_cloud_msg);
+-    }
+-}
+-
+-void voxelStereoVio::pubHistoryVoxels(pcl::PointCloud<pcl::PointXYZI>::Ptr voxels_history, double &timestamp)
+-{
+-    if (pub_voxels_history.getNumSubscribers() > 0)
+-    {
+-        sensor_msgs::PointCloud2 point_cloud_msg;
+-        pcl::toROSMsg(*voxels_history, point_cloud_msg);
+-        point_cloud_msg.header.stamp = ros::Time().fromSec(timestamp);
+-        point_cloud_msg.header.frame_id = "camera_init";
+-        pub_voxels_history.publish(point_cloud_msg);
+-    }
+-
+-    voxels_history->clear();
+-}
+-
+-void voxelStereoVio::pubVisitVoxels(pcl::PointCloud<pcl::PointXYZI>::Ptr voxels_visit, double &timestamp)
+-{
+-    if (pub_voxels_visit.getNumSubscribers() > 0)
+-    {
+-        sensor_msgs::PointCloud2 point_cloud_msg;
+-        pcl::toROSMsg(*voxels_visit, point_cloud_msg);
+-        point_cloud_msg.header.stamp = ros::Time().fromSec(timestamp);
+-        point_cloud_msg.header.frame_id = "camera_init";
+-        pub_voxels_visit.publish(point_cloud_msg);
+-    }
+-}
+-// display
++// Offline mode has no ROS subscribers; preserve the publisher's buffer cleanup.
++void voxelStereoVio::pubFeatImage(cv::Mat&, double&) {}
++void voxelStereoVio::pubOdometry(std::shared_ptr<state>, double&) {}
++void voxelStereoVio::pubPath(std::shared_ptr<state>, double&) {}
++void voxelStereoVio::pubHistoryPoints(pcl::PointCloud<pcl::PointXYZRGB>::Ptr, double&) {}
++void voxelStereoVio::pubWindowPoints(std::shared_ptr<state>, double&) {}
++void voxelStereoVio::pubHistoryVoxels(pcl::PointCloud<pcl::PointXYZI>::Ptr points, double&) { points->clear(); }
++void voxelStereoVio::pubVisitVoxels(pcl::PointCloud<pcl::PointXYZI>::Ptr, double&) {}
+ 
+ void voxelStereoVio::processImage(cameraData &image_measurements_const)
+ {
+@@ -1625,22 +1414,3 @@ void voxelStereoVio::run()
+     }
+ }
+ 
+-int main(int argc, char** argv)
+-{
+-    ros::init(argc, argv, "vio_node");
+-    ros::Time::init();
+-    
+-    voxelStereoVio VIO;
+-
+-    ros::Rate rate(200);
+-    while (ros::ok())
+-    {
+-        ros::spinOnce();
+-
+-        VIO.run();
+-
+-        rate.sleep();
+-    }
+-
+-    return 0;
+-}

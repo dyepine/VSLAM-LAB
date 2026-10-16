@@ -71,7 +71,8 @@ def run_label(row):
             'orbslam3_stereo_no_loop': 'ORB-SLAM3 stereo-vi без LC',
             'okvis2_no_loop': 'OKVIS2 mono-vi без LC',
             'orbslam3_stereo_vi': 'ORB-SLAM3 stereo-vi',
-            'okvis1_stereo_vi': 'OKVIS 1 stereo-vi'}.get(name, name)
+            'okvis1_stereo_vi': 'OKVIS 1 stereo-vi',
+            'voxel_svio_stereo_vi': 'Voxel-SVIO stereo-vi'}.get(name, name)
     return f"{name} / r{int(row['iteration']) + 1}"
 
 
