@@ -9,7 +9,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from evo.tools import file_interface
+import seaborn as sns
+from evo.tools import file_interface, plot
 from Evaluate.trajectory_inputs import read_pose_csv, to_evo, camera_to_body
 
 METRICS = [('ape_position_m', 'APE position [m]'), ('rpe_position_m', 'RPE position [m]'),
@@ -65,7 +66,10 @@ MAX_RUNS_PER_PAGE = 4
 def run_label(row):
     name = re.sub(r'^comparison_[^_]+_[^_]+_', '', row['experiment'])
     name = re.sub(r'_\d+$', '', name)
-    name = {'orbslam3_default': 'ORB-SLAM3', 'orbslam3_no_loop': 'ORB-SLAM3 без LC'}.get(name, name)
+    name = {'orbslam3_default': 'ORB-SLAM3', 'orbslam3_no_loop': 'ORB-SLAM3 без LC',
+            'orbslam3_mono_no_loop': 'ORB-SLAM3 mono-vi без LC',
+            'orbslam3_stereo_no_loop': 'ORB-SLAM3 stereo-vi без LC',
+            'okvis2_no_loop': 'OKVIS2 mono-vi без LC'}.get(name, name)
     return f"{name} / r{int(row['iteration']) + 1}"
 
 
@@ -113,6 +117,16 @@ def metrics_table(ax, rows):
 
 
 def plot_comparison(table):
+    # evo uses Seaborn's notebook font sizes and a sans-serif font. Keep the
+    # report style local so plotting does not change callers' Matplotlib setup.
+    style = {**sns.axes_style('whitegrid'), **sns.plotting_context('notebook'),
+             'font.family': 'sans-serif', 'font.sans-serif': ['DejaVu Sans'],
+             'text.usetex': False}
+    with plt.rc_context(style):
+        return _plot_comparison(table)
+
+
+def _plot_comparison(table):
     table = Path(table)
     with table.open() as stream: records = list(csv.DictReader(stream))
     output = table.parent / 'figures'
@@ -130,7 +144,8 @@ def plot_comparison(table):
             if row['status']!='evaluated': continue
             directory = Path(row['evaluation_directory'])
             summary = json.loads((directory/'summary.json').read_text())
-            metrics = {name:file_interface.load_res_file(directory/(name+'.zip')) for name, _ in METRICS
+            metrics = {name:file_interface.load_res_file(directory/(name+'.zip'),
+                                                        load_trajectories=name=='ape_position_m') for name, _ in METRICS
                        if (directory/(name+'.zip')).is_file()}
             estimate, reference = full_paths(summary)
             cached[i] = (summary, metrics, estimate, reference)
@@ -168,37 +183,57 @@ def plot_comparison(table):
             protocols = sorted({f"{s['protocol']['align']}; scale={s['protocol']['correct_scale']}; dt={s['protocol']['max_time_difference_s']:g}s; RPE Δ={s['protocol']['rpe_delta_m']:g}m" for s in summaries})
             subtitle = ' | '.join(protocols) or 'Нет успешно оценённых запусков'
             title = f'{dataset} · {sequence} — страница {number}/{total}'
-            fig = plt.figure(figsize=(14,9), layout='constrained')
-            body = page(fig, title+' · Маршрут', 'Полный GT и сохранённые позы; преобразование из оценки evo',
-                        [Line2D([0],[0],color='.75',label='Полный GT'), Line2D([0],[0],color='.25',ls='--',label='GT участка'), *handles])
-            ax = fig.add_subplot(body)
-            if full_gt is not None:
-                first = next(iter(cached.values()))[0]
-                for part in segments(full_gt.timestamps, first):
-                    ax.plot(full_gt.positions_xyz[part,0], full_gt.positions_xyz[part,1],color='.8',lw=1.2)
-                times=[]; positions=[]
-                for i in indices:
-                    if i not in cached: continue
-                    s, _, _, reference=cached[i]
-                    times.append(np.rint(reference.timestamps*1e9).astype(np.int64)+s['time_origin_ns']-origin)
-                    positions.append(reference.positions_xyz)
-                if times:
-                    time, ids=np.unique(np.concatenate(times),return_index=True)
-                    points=np.concatenate(positions)[ids]
-                    for part in segments(time/1e9, dict(summaries[0],time_origin_ns=origin)):
-                        ax.plot(points[part,0],points[part,1],color='.25',ls='--',lw=1.4,zorder=3)
-                for i in indices:
-                    if i not in cached: continue
-                    s, _, estimate, _=cached[i]
-                    for part in segments(estimate.timestamps,s):
-                        ax.plot(estimate.positions_xyz[part,0],estimate.positions_xyz[part,1],color=colors[i],lw=1.5)
-                    ax.scatter(*estimate.positions_xyz[0,:2],color=colors[i],marker='o',s=30,zorder=4)
-                    ax.scatter(*estimate.positions_xyz[-1,:2],color=colors[i],marker='X',s=45,zorder=4)
-            else: ax.text(.5,.5,'Нет траекторий для отображения',ha='center',transform=ax.transAxes)
-            if bounds: ax.set_xlim(bounds[0][0],bounds[1][0]); ax.set_ylim(bounds[0][1],bounds[1][1])
-            ax.set_aspect('equal',adjustable='box'); ax.set_xlabel('X, м'); ax.set_ylabel('Y, м'); ax.grid(alpha=.2)
-            ax.set_title('● начало   × конец сохранённого участка',fontsize=10)
-            path=output/(tag+'_trajectories'+suffix); save_figure(fig,path); files.append(path.name+'.png')
+            fig = plt.figure(figsize=(14, 10), layout='constrained')
+            body = page(fig, title+' · APE на маршруте',
+                        subtitle+'; цвет только на сопоставленных позах',
+                        [Line2D([0],[0],color='.85',label='Полный GT'),
+                         Line2D([0],[0],color='.7',label='Все сохранённые позы'),
+                         Line2D([0],[0],color='.25',ls='--',label='GT участка')])
+            columns = min(2, len(indices))
+            grid = body.subgridspec((len(indices)+1)//2, columns+1,
+                                   width_ratios=[1]*columns+[.05])
+            maximum = max(limits.get('ape_position_m', (0,))[0], 1e-6)
+            norm = matplotlib.colors.Normalize(vmin=0, vmax=maximum)
+            cmap = plt.get_cmap('viridis')
+            for slot, i in enumerate(indices):
+                ax = fig.add_subplot(grid[slot//columns, slot%columns])
+                ax.set_title(run_label(rows[i]), loc='left')
+                if i in cached:
+                    s, results, estimate, reference = cached[i]
+                    first = next(iter(cached.values()))[0]
+                    for part in segments(full_gt.timestamps, first):
+                        ax.plot(full_gt.positions_xyz[part,0], full_gt.positions_xyz[part,1],
+                                color='.85', lw=1.0)
+                    for part in segments(reference.timestamps, s):
+                        ax.plot(reference.positions_xyz[part,0], reference.positions_xyz[part,1],
+                                color='.25', ls='--', lw=1.2)
+                    for part in segments(estimate.timestamps, s):
+                        ax.plot(estimate.positions_xyz[part,0], estimate.positions_xyz[part,1],
+                                color='.7', lw=1.2)
+                    result = results.get('ape_position_m')
+                    if result is not None:
+                        matched = result.trajectories['estimate']
+                        errors = result.np_arrays['error_array']
+                        for part in segments(matched.timestamps, s):
+                            # evo owns the gradient construction; split before
+                            # drawing so gaps and invalid intervals stay visible.
+                            collection = plot.colored_line_collection(
+                                matched.positions_xyz[part], cmap(norm(errors[part])), plot.PlotMode.xy)
+                            collection.set_linewidth(2.5)
+                            ax.add_collection(collection)
+                        ax.scatter(matched.positions_xyz[:,0], matched.positions_xyz[:,1],
+                                   c=errors, cmap=cmap, norm=norm, s=8, zorder=3)
+                    else:
+                        ax.text(.5,.5,'APE недоступна',ha='center',transform=ax.transAxes)
+                else:
+                    ax.text(.5,.5,'Нет оценённой траектории',ha='center',transform=ax.transAxes)
+                if bounds:
+                    ax.set_xlim(bounds[0][0],bounds[1][0]); ax.set_ylim(bounds[0][1],bounds[1][1])
+                ax.set_aspect('equal',adjustable='box')
+                ax.set_xlabel('X, м'); ax.set_ylabel('Y, м'); ax.grid(alpha=.2)
+            fig.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap),
+                         cax=fig.add_subplot(grid[:,-1]), label='APE позиции, м · общая шкала')
+            path=output/(tag+'_ape_map'+suffix); save_figure(fig,path); files.append(path.name+'.png')
 
             fig = plt.figure(figsize=(15,10), layout='constrained')
             body = page(fig,title+' · Ошибки и метрики',subtitle,handles)
