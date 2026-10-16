@@ -19,9 +19,9 @@ from Evaluate.artifacts import source_directory, create_run_directory
 from Evaluate.trajectory_inputs import read_pose_csv, to_evo, camera_to_body
 
 DEFAULT_PROTOCOL = dict(align='SE3', correct_scale=False, max_time_difference_s=0.01,
-                        estimate_frame='camera', camera='rgb_0', evaluate_orientation=True,
+                        estimate_frame='camera', camera='rgb_0', evaluate_orientation=True, evaluate_rpe=True,
                         max_pose_gap_s=1.0, rpe_delta_m=1.0, rpe_relative_tolerance=0.1,
-                        gt_valid_intervals_ns=None)
+                        gt_valid_intervals_ns=None, T_body_reference=None)
 
 
 def validate_protocol(settings):
@@ -35,8 +35,16 @@ def validate_protocol(settings):
         raise ValueError('Use align: SE3/origin/none and correct_scale: false for metric VIO')
     if protocol['estimate_frame'] not in ('camera', 'body') or not isinstance(protocol['camera'], str):
         raise ValueError('Invalid estimate frame/camera')
-    if type(protocol['evaluate_orientation']) is not bool:
-        raise ValueError('evaluate_orientation must be boolean')
+    for key in ('evaluate_orientation', 'evaluate_rpe'):
+        if type(protocol[key]) is not bool:
+            raise ValueError(f'{key} must be boolean')
+    if protocol['T_body_reference'] is not None:
+        transform = np.asarray(protocol['T_body_reference'], dtype=float)
+        if (transform.shape != (4, 4) or not np.isfinite(transform).all() or
+                not np.allclose(transform[3], [0, 0, 0, 1]) or
+                not np.allclose(transform[:3, :3].T @ transform[:3, :3], np.eye(3), atol=1e-6) or
+                not np.isclose(np.linalg.det(transform[:3, :3]), 1, atol=1e-6)):
+            raise ValueError('T_body_reference must be a rigid SE3 transform')
     for key in ('max_time_difference_s', 'max_pose_gap_s', 'rpe_delta_m', 'rpe_relative_tolerance'):
         value = protocol[key]
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not np.isfinite(value) or value <= 0:
@@ -113,6 +121,9 @@ def calculate(estimate, reference, protocol, interval_boundaries=()):
         result.add_trajectory('reference', reference)
         result.add_trajectory('estimate', estimate)
         results['ape_' + name] = result
+        if not protocol['evaluate_rpe']:
+            unavailable['rpe_' + name] = 'Disabled by evaluation protocol'
+            continue
         # RPE pairs are selected by travelled GT distance, within each continuous segment.
         errors, times = [], []
         rpe = metrics.RPE(relation, delta=protocol['rpe_delta_m'], delta_unit=Unit.meters,
@@ -184,6 +195,10 @@ def evaluate_files(trajectory, gt, calibration, evaluation_root, protocol, prove
         if provenance.get('calibration_sha256') and digest(calibration) != provenance['calibration_sha256']:
             raise ValueError('Run calibration changed since execution')
         estimate = camera_to_body(estimate, calibration, protocol['camera'])
+    if protocol['T_body_reference'] is not None:
+        # T_world_reference = T_world_body @ T_body_reference. Use the estimate's
+        # own orientation for the lever arm; no reference orientation is invented.
+        estimate.transform(np.asarray(protocol['T_body_reference']), right_mul=True)
     native_log = native_log or output / 'system_output_00000.txt'
     text = native_log.read_text(errors='replace') if native_log.exists() else ''
     if text.count('Creation of new map with id:') > 1:
@@ -203,7 +218,8 @@ def evaluate_files(trajectory, gt, calibration, evaluation_root, protocol, prove
     results, summary = calculate(estimate, reference, protocol, boundaries)
     gaps = np.diff(est_ns).astype(float) / 1e9
     summary.update(protocol=protocol, evo_version=evo.__version__, time_origin_ns=origin_ns,
-                   estimate_input_frame=protocol['estimate_frame'], compared_pose_frame='body',
+                   estimate_input_frame=protocol['estimate_frame'],
+                   compared_pose_frame='reference' if protocol['T_body_reference'] is not None else 'body',
                    evaluation_code_sha256=digest(Path(__file__)),
                    input_adapter_sha256=digest(Path(__file__).with_name('trajectory_inputs.py')),
                    run_directory=str(run), trajectory=str(trajectory), trajectory_sha256=digest(trajectory),

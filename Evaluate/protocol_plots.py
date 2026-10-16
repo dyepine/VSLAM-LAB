@@ -38,6 +38,9 @@ def full_paths(summary):
         if hashlib.sha256(calibration.read_bytes()).hexdigest() != summary['calibration_sha256']:
             raise ValueError('Plot calibration changed since evaluation')
         camera_to_body(estimate, calibration, summary['protocol']['camera'])
+    offset = summary['protocol'].get('T_body_reference')
+    if offset is not None:
+        estimate.transform(np.asarray(offset), right_mul=True)
     estimate.transform(np.asarray(summary['alignment_transform_gt_from_estimate']))
     # Show measured GT over the saved estimate's time span, not the rest of a long recording.
     ids = np.flatnonzero((reference.timestamps >= estimate.timestamps[0]) &
