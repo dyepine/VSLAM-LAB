@@ -108,3 +108,9 @@ def build_execute_command(self, exp_it: int, exp: Experiment, dataset: DatasetVS
 - every value goes through `shlex.quote` (POSIX; a no-op for plain values) because `execute()` runs the string with `shell=True`. The result stays a plain string so `Run/ablations.prepare_ablation` can still post-process it.
 - override hook for side steps only (e.g. a one-off download the entry point needs, then `super()`); parameter derivation belongs in `resolve_parameters`. No baseline overrides it at the moment.
 - called from: `run_sequence` (once per run, after `create_calibration_exp_yaml`/`create_rgb_exp_csv`).
+### Per-experiment settings
+
+A native experiment may specify `MethodSettings: /absolute/path/to/settings.yaml`.
+`run_exp` sets this path on the fresh baseline instance for that experiment;
+other experiments retain their own settings. The file must already exist.
+Omitting the field keeps the packaged baseline settings.

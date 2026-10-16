@@ -12,6 +12,9 @@ SCRIPT_LABEL = f"\033[95m[{os.path.basename(__file__)}]\033[0m "
 
 def evaluate_sequence(exp, dataset, sequence_name, overwrite=False):
     sequence_name = str(sequence_name)
+    if getattr(exp, 'evaluation', None) is not None:
+        from Evaluate.protocol_sequence import evaluate_sequence as evaluate_with_protocol
+        return evaluate_with_protocol(exp, dataset, sequence_name)
 
     # Enable evo to save trajectories in zip format
     # TODO : Remove this
