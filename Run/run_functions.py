@@ -5,6 +5,8 @@ import time
 import shutil
 import importlib
 import subprocess
+import math
+import yaml
 import numpy as np
 import pandas as pd
 from typing import Any
@@ -319,6 +321,20 @@ def create_calibration_exp_yaml(exp: Any, dataset: Any, sequence_name: str, defa
     if calibration_exp_yaml.exists():
         calibration_exp_yaml.unlink()
     shutil.copy(calibration_yaml, calibration_exp_yaml)
+    noise = exp.parameters.get('imu_noise')
+    if noise is not None:
+        allowed = {'sigma_g_c', 'sigma_a_c', 'sigma_gw_c', 'sigma_aw_c'}
+        if not isinstance(noise, dict) or not noise or set(noise) - allowed:
+            raise ValueError('imu_noise must contain only IMU noise-density/random-walk fields')
+        if any(type(value) not in (int, float) or not math.isfinite(value) or value <= 0
+               for value in noise.values()):
+            raise ValueError('imu_noise values must be finite and positive')
+        calibration = yaml.safe_load(calibration_exp_yaml.read_text())
+        if len(calibration.get('imus', [])) != 1:
+            raise ValueError('imu_noise requires exactly one IMU in the calibration')
+        calibration['imus'][0].update(noise)
+        calibration_exp_yaml.write_text('%YAML 1.2\n---\n' + yaml.safe_dump(
+            calibration, sort_keys=False, default_flow_style=True))
     return calibration_exp_yaml
 
 def append_mask2former_columns(dataset: Any, sequence_name: str, sequence_path: Path, rgb_exp_csv: Path) -> None:
