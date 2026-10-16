@@ -261,11 +261,13 @@ def compare_exp(exp_yaml: str | Path) -> None:
 # eval_exp
 ##################################################################################################################################################
 ##################################################################################################################################################
-def evaluate_exp(exp_yaml: str | Path, overwrite: bool = False, protocol_override=None) -> None:
+def evaluate_exp(exp_yaml: str | Path, overwrite: bool = False, protocol_override=None, evaluation_overrides=None) -> None:
     experiments = load_experiments(exp_yaml)
     records = []
     first_evaluation_found = True
     for exp in experiments.values():
+        if evaluation_overrides is not None:
+            exp.evaluation = dict(exp.evaluation or {}, **evaluation_overrides.get(exp.name, {}))
         if protocol_override is not None:
             exp.evaluation = dict(exp.evaluation or {}, **protocol_override)
         # Protocol evaluations publish immutable versions; never overwrite older results.
