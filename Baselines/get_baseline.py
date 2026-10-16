@@ -22,6 +22,7 @@ from Baselines.baseline_files.baseline_orbslam3 import ORBSLAM3_baseline
 from Baselines.baseline_files.baseline_orbslam3 import ORBSLAM3_baseline_dev
 from Baselines.baseline_files.baseline_okvis2 import OKVIS2_baseline
 from Baselines.baseline_files.baseline_okvis2 import OKVIS2_baseline_dev
+from Baselines.baseline_files.baseline_okvis1 import OKVIS1_baseline
 from Baselines.baseline_files.baseline_pycuvslam import PYCUVSLAM_baseline
 
 # SfM baselines
@@ -50,6 +51,7 @@ def get_baseline_switcher():
         "orbslam3": lambda: ORBSLAM3_baseline(),
         "orbslam3-dev": lambda: ORBSLAM3_baseline_dev(),
         "okvis2": lambda: OKVIS2_baseline(),
+        "okvis1": lambda: OKVIS1_baseline(),
         "okvis2-dev": lambda: OKVIS2_baseline_dev(),
         "pycuvslam": lambda: PYCUVSLAM_baseline(),
         "da3": lambda: DA3_baseline(),
