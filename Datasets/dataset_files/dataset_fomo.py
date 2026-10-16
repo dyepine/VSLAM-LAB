@@ -26,11 +26,11 @@ from __future__ import annotations
 
 import contextlib
 import csv
-import io
 import json
+import os
 import shutil
 import xml.etree.ElementTree as ET
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Final
 from urllib.parse import quote, urlsplit
@@ -59,7 +59,9 @@ RAW_FILES: Final = ("gt.txt", "vectornav.csv", "xsens.csv", "CHANGELOG.md")
 # construct_deployment): recordings dated 2025-01-30 live in data/2025-01-29/, 2025-03-14 ones
 # in data/2025-03-10/.
 DEPLOYMENT_OF_DAY: Final[dict[str, str]] = {"2025-01-30": "2025-01-29", "2025-03-14": "2025-03-10"}
-DOWNLOAD_WORKERS: Final = 8
+DOWNLOAD_WORKERS: Final = int(os.environ.get('FOMO_DOWNLOAD_WORKERS', '8'))
+if not 1 <= DOWNLOAD_WORKERS <= 32:
+    raise ValueError('FOMO_DOWNLOAD_WORKERS must be between 1 and 32')
 DOWNLOAD_COMPLETE_MARKER: Final = ".download_complete"
 S3_NS: Final = {"s3": "http://s3.amazonaws.com/doc/2006-03-01/"}
 # VectorNav VN-100 datasheet ranges: accelerometer +-16 g, gyroscope +-2000 deg/s.
@@ -165,9 +167,10 @@ class FomoDataset(DatasetVSLAMLAB):
         # downloadFile prints one progress line per object; with ~5000 PNGs per recording that is
         # swallowed in favour of a single tqdm bar (on stderr).
         total_gb = sum(size for _, size in objects) / 1e9
-        with ThreadPoolExecutor(max_workers=DOWNLOAD_WORKERS) as pool, contextlib.redirect_stdout(io.StringIO()):
+        with open(os.devnull, 'w') as sink, ThreadPoolExecutor(max_workers=DOWNLOAD_WORKERS) as pool, contextlib.redirect_stdout(sink):
             jobs = [pool.submit(self._fetch_object, raw_path, recording_prefix, key, size) for key, size in objects]
-            for job in tqdm(jobs, desc=f"    fetching {sequence_name} ({total_gb:.1f} GB)", unit="file"):
+            for job in tqdm(as_completed(jobs), total=len(jobs),
+                            desc=f"    fetching {sequence_name} ({total_gb:.1f} GB)", unit="file"):
                 job.result()
         marker.touch()
 
