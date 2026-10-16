@@ -249,7 +249,7 @@ platforms = ["linux-64-cuda129"]
 fetch-source = "./git-clone.sh https://huggingface.co/vslamlab/droidslam-vslamlab Baselines/DROID-SLAM"
 execute-mono = 'vslamlab_droidslam_mono'
 execute-rgbd = 'vslamlab_droidslam_rgbd'
-execute-stereo = 'vslamlab_droidslam_stereo'
+execute-stereo = 'python Baselines/extra-files/droidslam/vslamlab_droidslam_stereo.py'
 
 [feature.droidslam.dependencies]
 droidslam = { version = "*", channel = "https://prefix.dev/vslamlab/vslamlab" }
