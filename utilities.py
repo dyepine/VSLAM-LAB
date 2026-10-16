@@ -523,7 +523,7 @@ _MAX_DOWNLOAD_ATTEMPTS: Final = 10
 _DOWNLOAD_RETRY_DELAY_S: Final = 3.0
 
 
-def _open_download(url: str, resume_from: int = 0):
+def _open_download(url: str, resume_from: int = 0, *, timeout=None):
     """Opens url via urllib.request, optionally resuming from byte offset resume_from via a
     Range request. Also handles the missing-intermediate-cert retry (see
     _fetch_missing_intermediate_context's docstring)."""
@@ -532,14 +532,14 @@ def _open_download(url: str, resume_from: int = 0):
         headers["Range"] = f"bytes={resume_from}-"
     request = urllib.request.Request(url, headers=headers)
     try:
-        return urllib.request.urlopen(request)
+        return urllib.request.urlopen(request, timeout=timeout)
     except urllib.error.URLError as e:
         if not isinstance(e.reason, ssl.SSLCertVerificationError):
             raise
         retry_ctx = _fetch_missing_intermediate_context(url)
         if retry_ctx is None:
             raise
-        return urllib.request.urlopen(request, context=retry_ctx)
+        return urllib.request.urlopen(request, context=retry_ctx, timeout=timeout)
 
 def downloadFile(url, dest_dir_path, file_size=None):
     file_name = url.split('/')[-1]
@@ -583,7 +583,11 @@ def downloadFile(url, dest_dir_path, file_size=None):
 
     return dest_file_path
     
-def downloadFile(url, dest_dir_path, file_size=None):
+def downloadFile(url, dest_dir_path, file_size=None, *, filename=None, checksum=None,
+                 resume_required=False, attempts=_MAX_DOWNLOAD_ATTEMPTS):
+    if filename is not None:
+        return _download_named_file(url, Path(dest_dir_path) / filename, file_size, checksum,
+                                    resume_required=resume_required, attempts=attempts)
     file_name = url.split('/')[-1]
     dest_file_path = os.path.join(dest_dir_path, file_name)
 
@@ -830,7 +834,8 @@ _ROSBAG_FRAME_EXTRACTION_TASK: Final[dict[str, str]] = {
 
 def run_rosbag_frame_extraction(
     ros_env: str, rosbag_path: str | Path, sequence_path: str | Path,
-    image_topic: str, cam: str | int, *, storage_id: str | None = None,
+    image_topic: str, cam: str | int, *, storage_id: str | None = None, header_stamp: bool = False,
+    strict: bool = False, separate_csv: bool = False,
 ) -> bool:
     """Runs the rosbag-frame-extraction pixi task (extract-rosbag-frames for ros_env="ros1",
     extract-ros2bag-frames for ros_env="ros2") for one camera, guarding against two issues in
@@ -862,10 +867,22 @@ def run_rosbag_frame_extraction(
 
     (sequence_path / f"rgb_{cam}").mkdir(parents=True, exist_ok=True)
     task = _ROSBAG_FRAME_EXTRACTION_TASK[ros_env]
-    inputs = f"--rosbag_path {rosbag_path} --sequence_path {sequence_path} --image_topic {image_topic} --cam {cam}"
+    import shlex
+    inputs = f"--rosbag_path {shlex.quote(str(rosbag_path))} --sequence_path {shlex.quote(str(sequence_path))} --image_topic {shlex.quote(image_topic)} --cam {shlex.quote(str(cam))}"
+    if ros_env != 'ros1' and (header_stamp or strict or separate_csv):
+        raise ValueError('Strict header/per-camera CSV options are ROS1-only')
+    if header_stamp:
+        inputs += ' --header-stamp'
+    if strict:
+        inputs += ' --strict'
+    if separate_csv:
+        inputs += ' --separate-csv'
     if storage_id:
         inputs += f" --storage_id {storage_id}"
-    subprocess.run(f"pixi run -e {ros_env} {task} {inputs}", shell=True, check=True)
+    ros_environment = os.environ.copy()
+    ros_environment.pop('PYTHONPATH', None)
+    subprocess.run(f"pixi run --frozen -e {ros_env} {task} {inputs}", shell=True,
+                   check=True, cwd=VSLAM_LAB_DIR, env=ros_environment)
     marker.touch()
     return True
 ##################################################################################################################################################
@@ -1175,3 +1192,120 @@ def synapse_download_folder(syn, folder_id: str, dest_dir: str | Path) -> None:
     synapseutils.syncFromSynapse(syn, folder_id, path=str(dest_dir), manifest="suppress")
 ##################################################################################################################################################
 
+
+
+class ResumeNotSupportedError(RuntimeError):
+    """A source ignored Range; the existing partial file has been preserved."""
+
+
+def download_onedrive_file(share_url, directory, size, *, filename, checksum):
+    """Resolve a public share on each retry, then use the common verified downloader.
+
+    Anonymous share resolution follows eugenenuke/onedrive-downloader; no account
+    token, signed download URL or login is persisted or printed.
+    """
+    import base64
+    import json
+    def resolve():
+        request = urllib.request.Request('https://api-badgerp.svc.ms/v1.0/token',
+            data=json.dumps({'appId': '5cbed6ac-a083-4e14-b191-b4ba07653de2'}).encode(),
+            headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            token = json.load(response)['token']
+        encoded = base64.urlsafe_b64encode(share_url.encode()).decode().rstrip('=')
+        request = urllib.request.Request(
+            'https://my.microsoftpersonalcontent.com/_api/v2.0/shares/u!' + encoded +
+            '/driveitem?select=@content.downloadUrl,id,name,size', data=b'',
+            headers={'Authorization': 'Badger ' + token, 'Prefer': 'autoredeem', 'Accept': 'application/json'})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            item = json.load(response)
+        if item.get('name') != filename or item.get('size') != size:
+            raise ValueError(f'OneDrive source metadata differs for {filename}')
+        return item['@content.downloadUrl']
+    return downloadFile(resolve, directory, size, filename=filename, checksum=checksum,
+                        resume_required=True)
+
+
+def _download_named_file(url, path, size, checksum, *, resume_required=False,
+                         attempts=_MAX_DOWNLOAD_ATTEMPTS):
+    """Opt-in atomic, resumable download for named /content endpoints.
+
+    Existing callers of downloadFile retain their original behavior.
+    Incomplete data survives failures under .part; only verified data becomes final.
+    """
+    import hashlib
+    import re
+    from tqdm import tqdm
+    progress_options = dict(unit='B', unit_scale=True, unit_divisor=1024,
+                            dynamic_ncols=True, mininterval=0.25,
+                            file=sys.stderr, disable=not sys.stderr.isatty())
+    if not size or not checksum:
+        raise ValueError('Named downloads require expected size and checksum')
+    if not isinstance(attempts, int) or attempts < 1:
+        raise ValueError('Download attempts must be a positive integer')
+    algorithm, expected = checksum.split(':', 1)
+    def verify(candidate):
+        if candidate.stat().st_size != size:
+            raise ValueError(f'Truncated or oversized download: {candidate}')
+        h = hashlib.new(algorithm)
+        with candidate.open('rb') as stream, tqdm(total=size, desc=f'Check {algorithm}: {path.name}',
+                                                 **progress_options) as progress:
+            for block in iter(lambda: stream.read(8 * 1024 * 1024), b''):
+                h.update(block)
+                progress.update(len(block))
+        if h.hexdigest() != expected:
+            raise ValueError(f'Checksum mismatch: {candidate}; preserved')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        verify(path)
+        return str(path)
+    part = path.with_name(path.name + '.part')
+    failures_without_progress = 0
+    request_count = 0
+    while True:
+        offset = part.stat().st_size if part.exists() else 0
+        if offset > size:
+            raise ValueError(f'Oversized partial download: {part}')
+        if offset == size:
+            break
+        saved_before = offset
+        request_count += 1
+        print(f'Downloading {path.name}: request {request_count}, failures without progress '
+              f'{failures_without_progress}/{attempts}, partial {offset}/{size} bytes', flush=True)
+        try:
+            resolved_url = url() if callable(url) else url
+            with _open_download(resolved_url, resume_from=offset, timeout=90) as response:
+                if response.status == 206:
+                    match = re.fullmatch(r'bytes (\d+)-(\d+)/(\d+)', response.headers.get('Content-Range', ''))
+                    if (not match or int(match[1]) != offset or int(match[3]) != size or
+                            not offset <= int(match[2]) < size):
+                        raise ValueError('Unexpected Content-Range')
+                elif response.status == 200:
+                    if offset:
+                        if resume_required:
+                            raise ResumeNotSupportedError(f'{path.name}: source ignored Range; partial preserved')
+                        print(f'{path.name}: server ignored Range; restarting verified full download', flush=True)
+                    offset = 0
+                else:
+                    raise ValueError(f'Unexpected HTTP status: {response.status}')
+                with part.open('ab' if offset else 'wb') as output, \
+                        tqdm(total=size, initial=offset, desc=path.name, **progress_options) as progress:
+                    while block := response.read1(1024 * 1024):
+                        output.write(block)
+                        if output.tell() > size:
+                            raise ValueError(f'Oversized download: {part}')
+                        progress.update(len(block))
+            if part.stat().st_size == size:
+                break
+            raise OSError(f'Truncated response for {path.name}: {part.stat().st_size}/{size} bytes')
+        except (OSError, http.client.HTTPException) as error:
+            print(f'{path.name}: {error}; incomplete download retained at {part}', flush=True)
+            saved_after = part.stat().st_size if part.exists() else 0
+            failures_without_progress = 0 if saved_after > saved_before else failures_without_progress + 1
+            if failures_without_progress >= attempts:
+                raise
+            time.sleep(_DOWNLOAD_RETRY_DELAY_S)
+    verify(part)
+    part.replace(path)
+    print(f'{path.name}: download complete, {algorithm} verified', flush=True)
+    return str(path)

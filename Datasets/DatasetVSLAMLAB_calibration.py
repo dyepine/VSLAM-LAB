@@ -58,28 +58,17 @@ def _get_rgbd_yaml_section(camera_params, sequence_name: str, dataset_path: Path
     return lines
 
 def _get_imu_yaml_section(imu_params) -> List[str]:
-    """Generate YAML lines for IMU parameters."""
-    fmt = ".6e"
-    lines = []
-    lines.append(f"  - {{imu_name: {imu_params['imu_name']},")
-    lines.append(f"     a_max: {imu_params['a_max']}, # acceleration saturation [m/s^2]")
-    lines.append(f"     g_max: {imu_params['g_max']},  # gyro saturation [rad/s]")
-    lines.append(f"     sigma_g_c: {imu_params['sigma_g_c']:{fmt}}, # gyro noise density ( gyro \"white noise\" ) [rad/s/sqrt(Hz)]")
-    lines.append(f"     sigma_gw_c: {imu_params['sigma_gw_c']:{fmt}}, # gyro drift noise density ( gyro bias diffusion ) [rad/s^2/sqrt(Hz)]")
-    lines.append(f"     sigma_a_c: {imu_params['sigma_a_c']:{fmt}}, # accelerometer noise density ( accel \"white noise\" ) [m/s^2/sqrt(Hz)]")
-    lines.append(f"     sigma_aw_c: {imu_params['sigma_aw_c']:{fmt}}, # accelerometer drift noise density ( accel bias diffusion ) [m/s^3/sqrt(Hz)]")
-    lines.append(f"     sigma_bg: {imu_params['sigma_bg']:{fmt}}, # gyro bias prior [rad/s]")
-    lines.append(f"     sigma_ba: {imu_params['sigma_ba']:{fmt}}, # accelerometer bias prior [m/s^2]")
-    lines.append(f"     a0: {imu_params['a0']}, # initial accelerometer bias [m/s^2]")
-    lines.append(f"     g0: {imu_params['g0']}, # initial gyro bias [rad/s]")
-    lines.append(f"     g: {imu_params['g']}, # Earth's acceleration due to gravity [m/s^2]")
-    lines.append(f"     s_a: {imu_params['s_a']}, # scale factor for accelerometer measurements: a_true = s_a * a_meas + b_a")
-    lines.append(f"     fps: {imu_params['fps']},")
-
-    T_BS_data = imu_params['T_BS']
-    flat_list_str = [f"{x:.13f}" for x in T_BS_data.flatten()]
-    lines.append("     T_BS: [" + ', '.join(flat_list_str) + "]  # Sensor extrinsics wrt. the body-frame.")
-
-    lines.append(f"    }}\n")
-
+    # Optional source fields stay absent instead of inventing saturation or bias priors.
+    fields = ["a_max", "g_max", "sigma_g_c", "sigma_gw_c", "sigma_a_c",
+              "sigma_aw_c", "sigma_bg", "sigma_ba", "a0", "g0", "g", "s_a", "fps"]
+    lines = [f"  - {{imu_name: {imu_params['imu_name']},"]
+    for key in fields:
+        if key in imu_params:
+            value = imu_params[key]
+            if key.startswith('sigma_'):
+                value = f"{value:.6e}"
+            lines.append(f"     {key}: {value},")
+    values = ', '.join(f"{x:.13f}" for x in imu_params['T_BS'].flatten())
+    lines.append(f"     T_BS: [{values}] # Sensor extrinsics wrt. the body-frame.")
+    lines.append("    }\n")
     return lines
