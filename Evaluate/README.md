@@ -55,16 +55,21 @@ it delegates to the same `evaluate_files` implementation. Plotting can consume
 saved evo ZIPs without recalculating metrics.
 
 Protocol comparisons publish two PNG/PDF sheets per sequence under `figures/`:
-`*_trajectories` shows the XY route; `*_errors` shows all four position/orientation
+`*_ape_map` shows the XY route colored by position APE; `*_errors` shows all four position/orientation
 APE/RPE curves and a table with four RMSE values, association coverage, matched/saved
 pose counts and statuses, including failures. Pages contain at most four runs
 (method/repetition pairs); larger matrices use `_pNN` suffixes with shared axis
 limits and stable colors across pages. The complete per-sequence table is also
 saved as `*_summary.csv`.
 
-The route sheet shows the full GT in gray, the common evaluated section dashed,
-and every saved observed estimate pose, transformed by the alignment already
-stored in the evaluation. Input data/calibration hashes are verified; plots never
+The route sheet shows each run separately with the full GT in light gray, its
+evaluated GT section dashed, and every saved observed estimate pose in gray.
+Matched estimate poses are colored by cached evo APE using a common gradient
+scale across all runs and pages of a sequence. Paths retain time gaps. Saved
+poses use the alignment already stored in the evaluation. The font is DejaVu
+Sans with evo-style Seaborn notebook sizes. Regeneration removes obsolete
+`*_trajectories` sheets listed in the previous manifest.
+Input data/calibration hashes are verified; plots never
 refit alignment or interpolate observations. Error curves read cached evo ZIPs;
 RPE all-pairs samples are scatter points. XY axes use equal metric scale.
 `manifest.json` records the source evaluations and generated sheets.
