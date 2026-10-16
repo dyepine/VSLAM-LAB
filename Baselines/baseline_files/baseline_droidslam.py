@@ -23,7 +23,19 @@ class DROIDSLAM_baseline(BaselineVSLAMLAB):
         self.color = (0.900, 0.600, 0.400) # 'orange'
         self.modes = ['mono', 'rgbd', 'stereo']
         self.cam_models = ['pinhole', 'radtan4', 'radtan5']
+        if baseline_name == 'droidslam':
+            # The local stereo entry point rectifies equidistant cameras.
+            self.cam_models.append('equid4')
         self.command_style = 'python'
+
+    def fetch_source(self):
+        super().fetch_source()
+        if self.baseline_name == 'droidslam':
+            weights = self.baseline_path / 'droid.pth'
+            # git without git-lfs leaves a text pointer, not the model.
+            if not weights.is_file() or weights.stat().st_size < 1024:
+                hf_hub_download(repo_id='vslamlab/droidslam-vslamlab', filename='droid.pth',
+                                local_dir=self.baseline_path)
 
 
 class DROIDSLAM_baseline_dev(DROIDSLAM_baseline):
