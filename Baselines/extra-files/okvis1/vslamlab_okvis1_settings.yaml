@@ -1,0 +1,25 @@
+%YAML:1.0
+---
+cam_stereo: [rgb_0, rgb_1]
+imu: imu_0
+camera_params:
+  sigma_absolute_translation: 0.0
+  sigma_absolute_orientation: 0.0
+  sigma_c_relative_translation: 0.0
+  sigma_c_relative_orientation: 0.0
+  timestamp_tolerance: 0.005
+numKeyframes: 5
+numImuFrames: 3
+ceres_options:
+  minIterations: 3
+  maxIterations: 10
+  timeLimit: -1.0
+detection_options:
+  threshold: 40.0
+  octaves: 0
+  maxNoKeypoints: 400
+imageDelay: 0.0
+displayImages: false
+useDriver: false
+publishing_options:
+  publishImuPropagatedState: false

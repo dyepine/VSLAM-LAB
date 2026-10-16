@@ -27,6 +27,7 @@ Baselines/asmk
 Baselines/ORB-SLAM3
 Baselines/ORB-SLAM3-DEV
 Baselines/OKVIS2
+Baselines/OKVIS1
 Baselines/OKVIS2-DEV
 Baselines/PyCuVSLAM
 Baselines/colmap

@@ -1,0 +1,55 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6d4524a..4218927 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -67,11 +67,11 @@ if(APPLE)
+   # The clang compiler (on osx) is somehow much more strict
+   # than the compilers on ubuntu and so this does not seem
+   # possible on OSX just yet.
+-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++11 -fPIC")
+-  set(CMAKE_CXX_FLAGS_EXTERNAL_PROJECTS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++11 -fPIC")
++  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++14 -fPIC")
++  set(CMAKE_CXX_FLAGS_EXTERNAL_PROJECTS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++14 -fPIC")
+ else()
+-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++11 -fPIC")
+-  set(CMAKE_CXX_FLAGS_EXTERNAL_PROJECTS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++11 -fPIC")
++  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++14 -fPIC")
++  set(CMAKE_CXX_FLAGS_EXTERNAL_PROJECTS "${CMAKE_CXX_FLAGS} -march=native -Wall -std=c++14 -fPIC")
+   #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wpedantic -Wextra -Werror") # use for code cleaning
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wpedantic -Wextra")
+ endif()
+@@ -126,6 +126,7 @@ if(${USE_SYSTEM_BRISK})
+ else()
+   ExternalProject_Add(brisk_external
+     URL "https://www.doc.ic.ac.uk/~sleutene/software/brisk-experimental2.zip"
++    URL_HASH SHA256=75b5fc0c72c9589d86224e8fb60a9f412079ee765f7ba1829ce44b8a16e41a4b
+     UPDATE_COMMAND ""
+     INSTALL_DIR ${CMAKE_BINARY_DIR}
+     CMAKE_ARGS
+@@ -193,7 +194,7 @@ else ()
+ endif ()
+ if(${USE_SYSTEM_CERES})
+   list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+-  find_package( Ceres 1.9 REQUIRED )
++  find_package( Ceres 2.0 REQUIRED )
+   include_directories(BEFORE ${CERES_INCLUDE_DIRS})
+   message(STATUS "Using system Ceres.")
+ else()
+@@ -283,8 +284,9 @@ set(CMAKE_CXX_FLAGS_WSUPPRESS
+       "${CMAKE_CXX_FLAGS_EXTERNAL_PROJECTS} -Wno-unused-parameter -Wno-maybe-uninitialized -Wno-sign-compare -Wno-unused-but-set-variable -Wno-unused-variable -Wno-pedantic")
+ message(STATUS "NOTE: Suppressing some warnings when compiling OpenGV.")
+ ExternalProject_Add(opengv_external
+-    GIT_REPOSITORY https://github.com/laurentkneip/opengv
+-    GIT_TAG 306a54e6c6b94e2048f820cdf77ef5281d4b48ad
++    URL https://codeload.github.com/laurentkneip/opengv/tar.gz/306a54e6c6b94e2048f820cdf77ef5281d4b48ad
++    DOWNLOAD_NAME opengv.tar.gz
++    URL_HASH SHA256=e21d7e85c11843ffde73152407fb5de54057ef1c5776738e4197ff01f5696e14
+     UPDATE_COMMAND ""
+     PATCH_COMMAND # forcing static libs
+         COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/cmake/opengv/CMakeLists.txt ${CMAKE_CURRENT_BINARY_DIR}/opengv/src/opengv/CMakeLists.txt
+@@ -476,3 +478,5 @@ install(FILES
+ # Install the export set for use with the install-tree
+ install(EXPORT okvisTargets DESTINATION
+   "${INSTALL_CMAKE_DIR}")
++
++include("${CMAKE_CURRENT_SOURCE_DIR}/../extra-files/okvis1/CMakeLists.txt")
