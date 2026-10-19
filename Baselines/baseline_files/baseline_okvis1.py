@@ -16,7 +16,7 @@ class OKVIS1_baseline(BaselineVSLAMLAB):
                          {'mode': 'stereo-vi', 'verbose': 0, 'imu_overrides': {}})
         self.settings_yaml = ADAPTER / 'vslamlab_okvis1_settings.yaml'
         self.modes = ['stereo-vi']
-        self.cam_models = ['pinhole', 'radtan4', 'radtan8', 'equid4']
+        self.cam_models = ['pinhole', 'radtan4', 'radtan5', 'radtan8', 'equid4']
         self.color = (0.85, 0.5, 0.15)
 
     def is_installed(self):

@@ -43,6 +43,7 @@ def native_settings(calibration, settings, imu_overrides):
         raise ValueError('OKVIS 1 does not support nonzero initial gyro bias g0')
     result['cameras'] = []
     models = {'equid4': ('equidistant', 4), 'radtan4': ('radialtangential', 4),
+              'radtan5': ('radialtangential8', 5),
               'radtan8': ('radialtangential8', 8), 'pinhole': ('radialtangential', 4)}
     for name in names:
         camera = next(item for item in calibration['cameras'] if item['cam_name'] == name)
@@ -53,6 +54,10 @@ def native_settings(calibration, settings, imu_overrides):
                         else camera['distortion_coefficients'])
         if len(coefficients) != size:
             raise ValueError(f'{name}: distortion coefficient count mismatch')
+        if camera['distortion_type'] == 'radtan5':
+            # Exact Brown polynomial as a rational model with unit denominator.
+            # Native order is [k1,k2,p1,p2,k3,k4,k5,k6].
+            coefficients = list(coefficients) + [0., 0., 0.]
         result['cameras'].append({
             'T_SC': (np.linalg.inv(T_BI) @ transform(camera['T_BS'])).ravel().tolist(),
             'image_dimension': camera['image_dimension'],
