@@ -1,0 +1,22 @@
+# Unchanged non-calibration defaults from the pinned author EuRoC calibration.
+imu_params:
+  max_imu_delta_t: 0.01
+  acc_max: 176.0
+  omega_max: 17
+  sigma_integration: 0.0
+imu_initialization:
+  velocity:
+  - 0.0
+  - 0
+  - 0.0
+  omega_bias:
+  - 0.0
+  - 0
+  - 0.0
+  acc_bias:
+  - 0.0
+  - 0.0
+  - 0.0
+  velocity_sigma: 2.0
+  omega_bias_sigma: 0.01
+  acc_bias_sigma: 0.1

@@ -195,6 +195,17 @@ class GrandtourDataset(DatasetVSLAMLAB):
         # Get Hugging Face repo id
         self.hf_repo_id: str = self.cfg["hf_repo_id"]
 
+    def check_sequence_integrity(self, sequence_name, verbose=False):
+        if (self.sequence_path(sequence_name) / ".import_pending").exists():
+            return False
+        return super().check_sequence_integrity(sequence_name, verbose)
+
+    def check_sequence_availability(self, sequence_name, verbose=True):
+        # Imports started by this adapter are resumable without removing user data.
+        if (self.sequence_path(sequence_name) / ".import_pending").exists():
+            return "non-available"
+        return super().check_sequence_availability(sequence_name, verbose)
+
     # ---- per-sequence layout helpers (each recomputed from sequence_name, never cached on self) ----
     def _mission(self, sequence_name: str) -> str:
         return MISSIONS[sequence_name]
@@ -277,6 +288,8 @@ class GrandtourDataset(DatasetVSLAMLAB):
         # every tarball is extracted, is what makes a retry after a dropped connection resume
         # rather than be skipped. hf_hub_download itself resumes partial files.
         sequence_path = self.sequence_path(sequence_name)
+        sequence_path.mkdir(parents=True, exist_ok=True)
+        (sequence_path / ".import_pending").touch()
         marker = sequence_path / ".download_complete"
         if marker.exists():
             return
@@ -304,7 +317,8 @@ class GrandtourDataset(DatasetVSLAMLAB):
         sequence_path = self.sequence_path(sequence_name)
         for i, (image_tag, _) in enumerate(self.CAMERAS):
             rgb_path = self.rgb_path(sequence_name) if i == 0 else sequence_path / f"rgb_{i}"
-            if rgb_path.exists():
+            marker = sequence_path / f".rgb_complete_{i}"
+            if marker.exists():
                 continue
             source_dir = self._image_dir(sequence_name, image_tag)
             rgb_path.mkdir(parents=True, exist_ok=True)
@@ -317,6 +331,7 @@ class GrandtourDataset(DatasetVSLAMLAB):
                     resized = img.resize(target_size, Image.Resampling.LANCZOS)
                     save_kwargs = {"quality": 95} if raw_image.suffix.lower() in (".jpg", ".jpeg") else {}
                     resized.save(rgb_path / raw_image.name, **save_kwargs)
+            marker.touch()
 
     def create_rgb_csv(self, sequence_name: str) -> None:
         # Each camera's zarr timestamp array is index-aligned with its decoded frames (frame k is
@@ -405,6 +420,7 @@ class GrandtourDataset(DatasetVSLAMLAB):
         # or across the two rig splits, which keep separate benchmark folders).
         if BENCHMARK_RETENTION == Retention.MINIMAL:
             shutil.rmtree(mission_path, ignore_errors=True)
+        (self.sequence_path(sequence_name) / ".import_pending").unlink(missing_ok=True)
 
 
 class GrandtourAlphasenseDataset(GrandtourDataset):
@@ -435,10 +451,11 @@ class GrandtourAlphasenseDataset(GrandtourDataset):
     def _imu_calibration(self, sequence_name: str) -> list[dict[str, Any]]:
         # Noise densities come from the per-sample covariances the release ships with the stream
         # (constant diagonals, sigma_d^2 = sigma_c^2 * rate), which land within ~20% of the BMI085
-        # datasheet. Random walks, saturation and priors aren't in the release - taken from the
-        # same Alphasense Core hardware's manufacturer example (sevensense-robotics
-        # alphasense_core_manual, files/example_7s_sensors_dont_use.yaml), as dataset_hilti2022.py
-        # and dataset_ariel.py do for this unit. The IMU is the body frame, so T_BS is identity.
+        # datasheet. Random walks come from the published GrandTour Allan calibration:
+        # leggedrobotics/grand_tour_box @ 7c7b7884e06a2082ac11f7b8a2ef3b7d25de5062,
+        # box_calibration/box_calibration/calibration/allan_variances/alphasense/imu.yaml.
+        # Saturation/initial biases remain manufacturer-example assumptions, not
+        # measured mission-specific calibration. The IMU is the body frame.
         imu_dir = self._topic_dir(sequence_name, self.IMU_TOPIC)
         if imu_dir is None:
             raise FileNotFoundError(f"{sequence_name}: data/{self.IMU_TOPIC}.tar not downloaded")
@@ -452,8 +469,8 @@ class GrandtourAlphasenseDataset(GrandtourDataset):
             "sigma_a_c": float(np.sqrt(accel_var / self.IMU_HZ)),
             "sigma_bg": 0.0,
             "sigma_ba": 0.0,
-            "sigma_gw_c": 0.000266,
-            "sigma_aw_c": 0.0043,
+            "sigma_gw_c": 1.8672379701877664e-06,
+            "sigma_aw_c": 4.317454918100831e-05,
             "g": 9.81007,
             "g0": [0.0, 0.0, 0.0],
             "a0": [0.0, 0.0, 0.0],

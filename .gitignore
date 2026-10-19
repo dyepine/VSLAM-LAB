@@ -27,6 +27,9 @@ Baselines/asmk
 Baselines/ORB-SLAM3
 Baselines/ORB-SLAM3-DEV
 Baselines/OKVIS2
+Baselines/OKVIS1
+Baselines/Voxel-SVIO
+Baselines/SqrtVINS
 Baselines/OKVIS2-DEV
 Baselines/PyCuVSLAM
 Baselines/colmap
@@ -71,3 +74,4 @@ recipes/
 Capabilities/sources
 # Clone of github.com/VSLAM-LAB/arstream (iPhone recording client, record-iphone / view-iphone / ios-install)
 Datasets/sources
+Baselines/SchurVINS

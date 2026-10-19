@@ -16,6 +16,9 @@ def main():
     parser.add_argument('--image_topic', type=str, help=f"image topic")
     parser.add_argument('--cam', type=str, help=f"camera index")
 
+    parser.add_argument('--header-stamp', action='store_true')
+    parser.add_argument('--strict', action='store_true')
+    parser.add_argument('--separate-csv', action='store_true')
     args = parser.parse_args()
 
     bridge = CvBridge()
@@ -25,6 +28,7 @@ def main():
     rgb_path = os.path.join(sequence_path, f'rgb_{args.cam}')
     print(f"Extracting frames from {rosbag_path} with topic {image_topic} to {rgb_path} ...")
 
+    Path(rgb_path).mkdir(parents=True, exist_ok=True)
     with rosbag.Bag(rosbag_path, 'r') as bag:
         rgb_files = []
         ts = []
@@ -32,18 +36,27 @@ def main():
             try:
                 cv_image = bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
             except Exception as e:
+                if args.strict:
+                    raise
                 print(f"Could not convert image: {e}")
                 continue
 
-            image_name = f"{t}.png"
+            stamp = msg.header.stamp if args.header_stamp else t
+            ts_ns = stamp.to_nsec()
+            if args.strict and (ts_ns <= 0 or (ts and ts_ns <= ts[-1])):
+                raise ValueError('Image header timestamps must be positive and increasing')
+            image_name = f"{ts_ns}.png" if args.header_stamp else f"{t}.png"
             image_path = os.path.join(rgb_path,image_name)
 
             rgb_files.append(f"rgb_{args.cam}/{image_name}")
-            ts_ns = t.to_nsec()
             ts.append(ts_ns)
-            cv2.imwrite(image_path, cv_image)
+            written = cv2.imwrite(image_path, cv_image)
+            if args.strict and not written:
+                raise OSError(f'Could not write image: {image_path}')
 
-    rgb_csv = Path(sequence_path) / "rgb.csv"
+    if args.strict and not ts:
+        raise ValueError(f'No images on {image_topic}')
+    rgb_csv = Path(sequence_path) / (f"rgb_{args.cam}.csv" if args.separate_csv else "rgb.csv")
     ts_col = f"ts_rgb_{args.cam} (ns)"
     path_col = f"path_rgb_{args.cam}"
 
@@ -52,7 +65,7 @@ def main():
         path_col: rgb_files,
     })
     
-    if rgb_csv.exists():
+    if rgb_csv.exists() and not args.separate_csv:
         rgb = pd.read_csv(rgb_csv)
 
         # Prevent accidental duplicate column names

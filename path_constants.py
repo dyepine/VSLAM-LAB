@@ -8,8 +8,8 @@ HUGGINGFACE_TOKEN = None
 VSLAM_LAB_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 VSLAM_LAB_PATH = Path(os.path.dirname(VSLAM_LAB_DIR))
 
-VSLAMLAB_BENCHMARK = VSLAM_LAB_PATH / "VSLAM-LAB-Benchmark"
-VSLAMLAB_EVALUATION = VSLAM_LAB_PATH / 'VSLAM-LAB-Evaluation'
+VSLAMLAB_BENCHMARK = Path(os.environ.get('VSLAMLAB_BENCHMARK', VSLAM_LAB_PATH / "VSLAM-LAB-Benchmark"))
+VSLAMLAB_EVALUATION = Path(os.environ.get('VSLAMLAB_EVALUATION', VSLAM_LAB_PATH / 'VSLAM-LAB-Evaluation'))
 VSLAMLAB_BASELINES = VSLAM_LAB_DIR / 'Baselines'
 VSLAMLAB_VIDEOS = VSLAMLAB_BENCHMARK / 'VIDEOS'
 
@@ -28,7 +28,7 @@ ABLATION_PARAMETERS_CSV = 'log_ablation_parameters.csv'
 # Experiment Parameters: keys consumed by the run pipeline itself (Run/run_functions.py) rather than
 # forwarded to the baseline; BaselineVSLAMLAB.build_execute_command warns about any other unknown key.
 EXP_FRAMEWORK_PARAMETERS = ('rgb_csv', 'rgb_idx', 'rgb_step', 'rgb_max', 'rgb_vpr', 'rgb_placecell',
-                            'refraction', 'segmentation', 'depth', 'calibration')
+                            'refraction', 'segmentation', 'depth', 'calibration', 'imu_noise')
 
 TRAJECTORY_FILE_NAME = 'KeyFrameTrajectory'
 SCRIPT_LABEL = f"\033[95m[{os.path.basename(__file__)}]\033[0m "

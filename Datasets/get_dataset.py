@@ -62,6 +62,8 @@ from Datasets.dataset_files.dataset_uzh_fpv import UzhFpvDataset
 from Datasets.dataset_files.dataset_grandtour import GrandtourAlphasenseDataset
 from Datasets.dataset_files.dataset_grandtour import GrandtourZed2iDataset
 from Datasets.dataset_files.dataset_fomo import FomoDataset
+from Datasets.dataset_files.dataset_botanicgarden import BotanicgardenDataset
+from Datasets.dataset_files.dataset_geode import GeodeGammaDataset
 
 # Development
 from Datasets.dataset_files.dataset_videos import VideosDataset
@@ -127,6 +129,8 @@ def get_dataset(dataset_name):
         "grandtour-alphasense": lambda: GrandtourAlphasenseDataset(),
         "grandtour-zed2i": lambda: GrandtourZed2iDataset(),
         "fomo": lambda: FomoDataset(),
+        "botanicgarden": lambda: BotanicgardenDataset(),
+        "geode-gamma": lambda: GeodeGammaDataset(),
 
         # Development
         "videos": lambda: VideosDataset(),

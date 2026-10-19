@@ -1,0 +1,75 @@
+# Explicit evaluation protocols
+
+Native experiments can supply `Evaluation` to use evo-backed protocol evaluation
+through `evaluate_exp` / `evaluate_sequence`. Without this field the existing
+benchmark evaluator remains unchanged.
+
+```yaml
+example:
+  Config: /absolute/path/to/sequences.yaml
+  Module: orbslam3
+  NumRuns: 2
+  Parameters: {mode: stereo-vi, verbose: 0}
+  Evaluation:
+    align: origin
+    correct_scale: false
+    estimate_frame: camera
+    camera: rgb_0
+    max_time_difference_s: 0.01
+    evaluate_orientation: true
+    max_pose_gap_s: 1.0
+    rpe_delta_m: 1.0
+    rpe_relative_tolerance: 0.1
+```
+
+`estimate_frame` describes the trajectory export, not the sensor inputs to the
+method. A camera trajectory is right-multiplied by inverse calibration `T_BS`
+exactly once to compare body poses. A body trajectory is used directly. This is
+separate from world-frame alignment, which does not correct metric scale.
+`align: origin` uses evo's `align_origin` after timestamp association: the first
+matched body pose (position and orientation) is mapped to its GT pose and the same
+transform is applied to the whole trajectory. It does not refit later drift.
+`align: SE3` instead fits all associated positions; `align: none` applies no fit.
+Origin alignment requires a reference with meaningful orientations.
+The reference is expected to contain poses of the calibration's body frame.
+
+All repetitions are processed. Each evaluation publishes an immutable directory
+under the sequence output's `evaluations/<iteration>/<timestamp>`, including evo
+ZIPs, protocol, metrics and association coverage. Native logs retain the path to
+the latest evaluation. Log updates use a per-log lock and atomic replacement.
+`comparison.csv` next to the native experiment YAML contains every run, including
+execution and evaluation failures. `evaluate_exp` finishes the batch before
+raising if any runs failed; `compare_exp` builds a table from saved evaluations.
+No scores are averaged across different sequences. Protocol overrides merge
+with each experiment's saved protocol, so an association-tolerance override need
+not change its pose frame.
+
+Association uses standard evo semantics, with nanoseconds converted to relative
+seconds. Reported fractions refer to unique matched saved estimate poses;
+matched-pair counts may differ because evo permits reuse. RPE uses distance
+pairs within continuous matched segments. No interpolation or automatic
+relaxation of the time tolerance is performed.
+
+`protocol.evaluate_run` retains support for previously saved research artifacts;
+it delegates to the same `evaluate_files` implementation. Plotting can consume
+saved evo ZIPs without recalculating metrics.
+
+Protocol comparisons publish two PNG/PDF sheets per sequence under `figures/`:
+`*_ape_map` shows the XY route colored by position APE; `*_errors` shows all four position/orientation
+APE/RPE curves and a table with four RMSE values, association coverage, matched/saved
+pose counts and statuses, including failures. Pages contain at most four runs
+(method/repetition pairs); larger matrices use `_pNN` suffixes with shared axis
+limits and stable colors across pages. The complete per-sequence table is also
+saved as `*_summary.csv`.
+
+The route sheet shows each run separately with the full GT in light gray, its
+evaluated GT section dashed, and every saved observed estimate pose in gray.
+Matched estimate poses are colored by cached evo APE using a common gradient
+scale across all runs and pages of a sequence. Paths retain time gaps. Saved
+poses use the alignment already stored in the evaluation. The font is DejaVu
+Sans with evo-style Seaborn notebook sizes. Regeneration removes obsolete
+`*_trajectories` sheets listed in the previous manifest.
+Input data/calibration hashes are verified; plots never
+refit alignment or interpolate observations. Error curves read cached evo ZIPs;
+RPE all-pairs samples are scatter points. XY axes use equal metric scale.
+`manifest.json` records the source evaluations and generated sheets.
