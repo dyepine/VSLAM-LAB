@@ -100,4 +100,3 @@ def geometry(calibration):
         'publisher_calibration_issue': 'https://github.com/PengYu-Team/GEODE_dataset/issues/19',
     }
     return size, maps, (P0, P1), extrinsics, T_BI, metadata
-
