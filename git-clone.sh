@@ -1,7 +1,7 @@
 #!/bin/bash
 # Usage: ./git-clone.sh <url> <dest_dir> [<branch>]
 # Clones <url> (GitHub, Hugging Face, ...) recursively into <dest_dir>, relative to the VSLAM-LAB root
-# (Baselines/<Name>, Capabilities/sources/<name>), and does nothing if <dest_dir> already exists, so every
+# (Baselines/<Name>, Capabilities/sources/<name>), and does nothing if <dest_dir> is already populated, so every
 # `fetch-source` task can be re-run safely. <branch> is optional; when given, that branch is checked out (and its
 # submodules are initialised) instead of the repo's default branch.
 
@@ -15,7 +15,13 @@ if [ -z "$url" ] || [ -z "$dest_dir" ]; then
 fi
 
 if [ -d "$dest_dir" ]; then
-  exit 0
+  # Docker volumes exist before the first clone. An empty destination is valid
+  # for git clone; retain the previous no-op for populated directories.
+  shopt -s nullglob dotglob
+  existing_entries=("$dest_dir"/*)
+  if (( ${#existing_entries[@]} > 0 )); then
+    exit 0
+  fi
 fi
 
 branch_flag=()
