@@ -1,0 +1,46 @@
+dataset_name: geode-gamma
+rgb_hz: 10.0
+modes: [mono, mono-vi, stereo, stereo-vi]
+cam_models: [radtan4, radtan5]
+raw_formats: [ros1]
+sequence_names: [offroad1, offroad1_raw_radtan4, offroad7, offroad1_raw_radtan5]
+stereo_tolerance_ns: 2000000
+image_count_bounds:
+  offroad7: 2208  # Published 184 s at 10 Hz, with 20% planning margin.
+assets:
+  bag:
+    name: Offroad1_gamma.bag
+    size: 3204605460
+    drive_id: 1v70uMx5GcjSpvLxA0YsEN6_wX7zK7yHT
+    md5: a34676476f176faf8e4606ca0f17e942
+  calibration:
+    name: gamma_config.yaml
+    size: 4682
+    drive_id: 1GheigvWF1YTTw-2y4XrN4f-5i5wh2m4s
+    sha256: f67eaba499306f08d81a2f8dfe8459bb0246d4ee7294b03478f28affb56cc47a
+  reference:
+    name: Offroad1.txt
+    size: 6126695
+    drive_id: 15sbhriCWbvfBloe8qJOJPhBsda9eD7Mg
+    sha256: 3b6a2bc9a35aa0a3efe79fbe1e7f52da8e665fe4b6d3441ea01d664b03b552d1
+assets_by_sequence:
+  offroad7:
+    bag:
+      name: Offroad7_gamma.bag
+      size: 1401156863
+      drive_id: 1709qoJD2qqtKM-6LRLdgBNUfZUNCWV1d
+      md5: d035c5423d4d47006638d98e01cd7991
+    reference:
+      name: Offroad7.txt
+      size: 2175600
+      drive_id: 1BczL0qxIEfx2dqciEH3vd14obLZrfTQ7
+      md5: 91b884835cd81d3847aa7904c4b458d0
+about:
+  summary: GEODE gamma Offroad1/Offroad7; stereo and external Xsens IMU
+  homepage: https://thisparticle.github.io/geode/
+  license: No explicit data license found; consult the publisher
+  features: [Real, Outdoor]
+  access: Public Google Drive
+  publication: Heterogeneous LiDAR Dataset for Benchmarking Robust Localization in Diverse Degenerate Scenarios
+  publication_url: https://arxiv.org/abs/2409.04961
+  year: 2024
