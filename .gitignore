@@ -74,3 +74,4 @@ recipes/
 Capabilities/sources
 # Clone of github.com/VSLAM-LAB/arstream (iPhone recording client, record-iphone / view-iphone / ios-install)
 Datasets/sources
+Baselines/SchurVINS

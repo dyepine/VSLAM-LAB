@@ -1,0 +1,25 @@
+diff --git a/svo/src/schur_vins.cpp b/svo/src/schur_vins.cpp
+index 83cc6d0..7c2ec65 100644
+--- a/svo/src/schur_vins.cpp
++++ b/svo/src/schur_vins.cpp
+@@ -155,7 +155,19 @@ void SchurVINS::PredictionState(const Eigen::Vector3d& acc, const Eigen::Vector3
+ }
+ 
+ void SchurVINS::Prediction(double _dt, const Eigen::Vector3d& _acc, const Eigen::Vector3d& _gyr) {
+-    CHECK(_dt >= 0 && _dt < 0.015) << "dt: " << _dt;
++    CHECK(std::isfinite(_dt) && _dt >= 0) << "dt: " << _dt;
++    // Xsens 100 Hz data can contain valid intervals above the EuRoC 15 ms limit.
++    // Keep the original propagation below that limit using the same held input;
++    // do not drop samples or alter their timestamps.
++    if (_dt >= 0.015) {
++        const int steps = static_cast<int>(std::ceil(_dt / 0.01));
++        const double end_ts = curr_state->ts + _dt;
++        LOG(WARNING) << "Subdividing IMU propagation interval " << _dt << " into " << steps << " steps";
++        for (int step = 0; step < steps; ++step)
++            Prediction(_dt / steps, _acc, _gyr);
++        curr_state->ts = end_ts;
++        return;
++    }
+     Eigen::Vector3d acc = _acc - curr_state->ba;
+     Eigen::Vector3d gyr = _gyr - curr_state->bg;
+ 

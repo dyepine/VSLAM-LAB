@@ -1,0 +1,31 @@
+diff --git a/svo/include/svo/schur_vins.h b/svo/include/svo/schur_vins.h
+index 2512bba..86a2c85 100644
+--- a/svo/include/svo/schur_vins.h
++++ b/svo/include/svo/schur_vins.h
+@@ -31,6 +31,7 @@ class SchurVINS {
+     SchurVINS();
+ 
+     void InitImuModel(double acc_n, double acc_w, double gyr_n, double gyr_w);
++    void InitGravity(double magnitude) { gravity = Eigen::Vector3d(0, 0, -magnitude); }
+     void InitExtrinsic(const svo::CameraBundle::Ptr camera_bundle);
+     void InitCov();
+     void InitMaxState(int val);
+diff --git a/svo/src/frame_handler_base.cpp b/svo/src/frame_handler_base.cpp
+index a6e31d3..a0dc747 100644
+--- a/svo/src/frame_handler_base.cpp
++++ b/svo/src/frame_handler_base.cpp
+@@ -1347,11 +1347,13 @@ void FrameHandlerBase::setBundleAdjuster(const AbstractBundleAdjustmentPtr& ba)
+ 
+ void FrameHandlerBase::setImuHandler(const ImuHandlerPtr& imu_handler) {
+     imu_handler_ = imu_handler;
+-    if (schur_vins_ && imu_handler)
++    if (schur_vins_ && imu_handler) {
++        schur_vins_->InitGravity(imu_handler_->imu_calib_.gravity_magnitude);
+         schur_vins_->InitImuModel(imu_handler_->imu_calib_.acc_noise_density,
+                                   imu_handler_->imu_calib_.acc_bias_random_walk_sigma,
+                                   imu_handler_->imu_calib_.gyro_noise_density,
+                                   imu_handler_->imu_calib_.gyro_bias_random_walk_sigma);  // init imu instriscs
++    }
+ }
+ 
+ std::vector<FramePtr> FrameHandlerBase::closeKeyframes() const
