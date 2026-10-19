@@ -10,7 +10,7 @@ if [[ ! -d "$source_dir/.git" ]]; then
     git -C "$source_dir" checkout --detach "$revision"
 fi
 [[ $(git -C "$source_dir" rev-parse HEAD) == "$revision" ]] || { echo 'Unexpected Voxel-SVIO revision; checkout preserved.' >&2; exit 1; }
-for patch in offline compatibility; do
+for patch in offline compatibility memory_safety; do
     if git -C "$source_dir" apply --check "$adapter_dir/$patch.patch" 2>/dev/null; then
         git -C "$source_dir" apply "$adapter_dir/$patch.patch"
     else
