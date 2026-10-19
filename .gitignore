@@ -29,6 +29,7 @@ Baselines/ORB-SLAM3-DEV
 Baselines/OKVIS2
 Baselines/OKVIS1
 Baselines/Voxel-SVIO
+Baselines/SqrtVINS
 Baselines/OKVIS2-DEV
 Baselines/PyCuVSLAM
 Baselines/colmap
