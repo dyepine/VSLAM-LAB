@@ -1,0 +1,109 @@
+diff --git a/src/frame.cpp b/src/frame.cpp
+index 2cd6b16..3210e39 100644
+--- a/src/frame.cpp
++++ b/src/frame.cpp
+@@ -66,6 +66,16 @@ void frame::makeImageLeft(unsigned char* color, unsigned char* mask, std::shared
+ 			}
+ 		}
+ 
++		// Central differences do not define the first/last row. The pixel
++		// selector can still sample them at a coarser pyramid level.
++		for(int x = 0; x < wl; x++)
++		{
++			dI_l[x].tail<2>().setZero();
++			dI_l[x + wl * (hl - 1)].tail<2>().setZero();
++			dabs_l[x] = 0.0f;
++			dabs_l[x + wl * (hl - 1)] = 0.0f;
++		}
++
+ 		for(int idx = wl; idx < wl * (hl - 1); idx++)
+ 		{
+ 			float dx = 0.5f * (dI_l[idx + 1][0] - dI_l[idx - 1][0]);
+@@ -136,6 +146,16 @@ void frame::makeImageRight(unsigned char* color, unsigned char* mask, std::share
+ 			}
+ 		}
+ 
++		// Central differences do not define the first/last row. The pixel
++		// selector can still sample them at a coarser pyramid level.
++		for(int x = 0; x < wl; x++)
++		{
++			dI_l[x].tail<2>().setZero();
++			dI_l[x + wl * (hl - 1)].tail<2>().setZero();
++			dabs_l[x] = 0.0f;
++			dabs_l[x + wl * (hl - 1)] = 0.0f;
++		}
++
+ 		for(int idx = wl; idx < wl * (hl - 1); idx++)
+ 		{
+ 			float dx = 0.5f * (dI_l[idx + 1][0] - dI_l[idx - 1][0]);
+diff --git a/src/pixelSelector.cpp b/src/pixelSelector.cpp
+index 8f27fd8..68892c2 100644
+--- a/src/pixelSelector.cpp
++++ b/src/pixelSelector.cpp
+@@ -12,8 +12,10 @@ pixelSelector::pixelSelector(int w, int h)
+ 	current_potential = 3;
+ 
+ 	grad_hist = new int[100 * (1 + w / 32) * (1 + h / 32)];
+-	ths = new float[(w / 32) * (h / 32) + 100];
+-	ths_smoothed = new float[(w / 32) * (h / 32) + 100];
++	// Include the partial right/bottom blocks addressed by pixel coordinates.
++	const int blocks = ((w + 31) / 32) * ((h + 31) / 32);
++	ths = new float[blocks];
++	ths_smoothed = new float[blocks];
+ 
+ 	allow_fast = false;
+ 	grad_hist_frame = nullptr;
+@@ -29,6 +31,9 @@ pixelSelector::~pixelSelector()
+ 
+ int computeHistQuantil(int* hist, float below)
+ {
++	// A partial block may contain only excluded image-border pixels.
++	if (hist[0] == 0) return 0;
++
+ 	int th = hist[0] * below + 0.5f;
+ 
+ 	for(int i = 0; i < 90; i++)
+@@ -48,8 +53,8 @@ void pixelSelector::makeHistsLeft(std::shared_ptr<frame> fh)
+ 	int w = wG[0];
+ 	int h = hG[0];
+ 
+-	int w32 = w / 32;
+-	int h32 = h / 32;
++	int w32 = (w + 31) / 32;
++	int h32 = (h + 31) / 32;
+ 	ths_step = w32;
+ 
+ 	for(int y = 0; y < h32; y++)
+@@ -60,8 +65,8 @@ void pixelSelector::makeHistsLeft(std::shared_ptr<frame> fh)
+ 
+ 			memset(hist_0, 0, sizeof(int) * 50);
+ 
+-			for(int j = 0; j < 32; j++)
+-				for(int i = 0; i < 32; i++)
++			for(int j = 0; j < 32 && 32 * y + j < h; j++)
++				for(int i = 0; i < 32 && 32 * x + i < w; i++)
+ 				{
+ 					int it = i + 32 * x;
+ 					int jt = j + 32 * y;
+@@ -390,8 +395,8 @@ void pixelSelector::makeHistsRight(std::shared_ptr<frame> fh)
+ 	int w = wG[0];
+ 	int h = hG[0];
+ 
+-	int w32 = w / 32;
+-	int h32 = h / 32;
++	int w32 = (w + 31) / 32;
++	int h32 = (h + 31) / 32;
+ 	ths_step = w32;
+ 
+ 	for(int y = 0; y < h32; y++)
+@@ -402,8 +407,8 @@ void pixelSelector::makeHistsRight(std::shared_ptr<frame> fh)
+ 
+ 			memset(hist_0, 0, sizeof(int) * 50);
+ 
+-			for(int j = 0; j < 32; j++)
+-				for(int i = 0; i < 32; i++)
++			for(int j = 0; j < 32 && 32 * y + j < h; j++)
++				for(int i = 0; i < 32 && 32 * x + i < w; i++)
+ 				{
+ 					int it = i + 32 * x;
+ 					int jt = j + 32 * y;
